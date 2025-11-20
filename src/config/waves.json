@@ -1,0 +1,13 @@
+{
+  "stage1": {
+    "spawnInterval": 1.3,
+    "maxEnemies": 40,
+    "enemySpeed": 120,
+    "enemyBulletSpeed": 220,
+    "patterns": [
+      "line",
+      "zigzag",
+      "dive"
+    ]
+  }
+}

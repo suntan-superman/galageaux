@@ -1,0 +1,15 @@
+{
+  "name": "expo-shooter-modern",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start"
+  },
+  "dependencies": {
+    "@shopify/react-native-skia": "1.2.3",
+    "expo": "^51.0.0",
+    "expo-av": "~14.0.4",
+    "react": "18.2.0",
+    "react-native": "0.74.5"
+  }
+}
