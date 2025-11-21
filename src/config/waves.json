@@ -1,13 +1,15 @@
 {
   "stage1": {
-    "spawnInterval": 1.3,
+    "name": "Orbit Siege",
+    "spawnInterval": 1.2,
     "maxEnemies": 40,
-    "enemySpeed": 120,
-    "enemyBulletSpeed": 220,
+    "enemySpeed": 130,
+    "enemyBulletSpeed": 230,
     "patterns": [
       "line",
       "zigzag",
-      "dive"
+      "dive",
+      "formation_v"
     ]
   }
 }

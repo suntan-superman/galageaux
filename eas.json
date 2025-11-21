@@ -1,0 +1,30 @@
+{
+  "cli": {
+    "version": ">= 16.26.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "production": {
+      "ios": {
+        "image": "latest"
+      },
+      "autoIncrement": true
+    },
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal"
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "sroy@prologixsa.com",
+        "ascAppId": "6755568919",
+        "appleTeamId": "K2H76A4V66"
+      }
+    }
+  }
+}

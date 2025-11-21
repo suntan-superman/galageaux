@@ -1,0 +1,22 @@
+{
+  "stage1": {
+    "hp": 100,
+    "enterY": 100,
+    "speed": 40,
+    "bulletSpeed": 260,
+    "phases": [
+      {
+        "hpThreshold": 70,
+        "pattern": "radial"
+      },
+      {
+        "hpThreshold": 40,
+        "pattern": "spread"
+      },
+      {
+        "hpThreshold": 0,
+        "pattern": "burst"
+      }
+    ]
+  }
+}

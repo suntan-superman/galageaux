@@ -1,4 +1,3 @@
-
 export const PLAYER_WIDTH = 40;
 export const PLAYER_HEIGHT = 22;
 export const ENEMY_SIZE = 28;

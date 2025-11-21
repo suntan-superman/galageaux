@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
@@ -27,11 +26,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center'
   },
-  title: { color: '#f9fafb', fontSize: 32, fontWeight: '800', marginBottom: 12 },
-  score: { color: '#e5e7eb', fontSize: 18, marginBottom: 24 },
-  row: { flexDirection: 'row' },
-  buttonPrimary: { paddingHorizontal: 24, paddingVertical: 10, backgroundColor: '#22c55e', borderRadius: 999, marginRight: 8 },
-  buttonPrimaryText: { color: '#020617', fontSize: 16, fontWeight: '700' },
-  buttonSecondary: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: '#e5e7eb' },
-  buttonSecondaryText: { color: '#e5e7eb', fontSize: 16, fontWeight: '700' }
+  title: {
+    color: '#f9fafb',
+    fontSize: 32,
+    fontWeight: '800',
+    marginBottom: 12
+  },
+  score: {
+    color: '#e5e7eb',
+    fontSize: 18,
+    marginBottom: 24
+  },
+  row: {
+    flexDirection: 'row'
+  },
+  buttonPrimary: {
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    backgroundColor: '#22c55e',
+    borderRadius: 999,
+    marginRight: 8
+  },
+  buttonPrimaryText: {
+    color: '#020617',
+    fontSize: 16,
+    fontWeight: '700'
+  },
+  buttonSecondary: {
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    backgroundColor: 'transparent',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#e5e7eb'
+  },
+  buttonSecondaryText: {
+    color: '#e5e7eb',
+    fontSize: 16,
+    fontWeight: '700'
+  }
 });

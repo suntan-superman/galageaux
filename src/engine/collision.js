@@ -1,4 +1,3 @@
-
 export function aabb(a, b) {
   return !(
     a.x + a.width < b.x ||
