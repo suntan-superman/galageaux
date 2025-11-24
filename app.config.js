@@ -7,17 +7,18 @@ export default {
 
     newArchEnabled: true,
 
-    icon: "./assets/icon.png",
+    icon: "./assets/icons/notext_ios_1024.png",
 
-    splash: {
-      image: "./assets/splash.png",        // optional – you can replace with your own
-      resizeMode: "contain",
-      backgroundColor: "#020617"
-    },
+//  splash: {
+//      image: "./assets/splash.png",        // optional – you can replace with your own
+//      resizeMode: "contain",
+//      backgroundColor: "#020617"
+//  },
 
     ios: {
       bundleIdentifier: "com.sjroy5.galageaux",
       supportsTablet: false,
+      icon: "./assets/icons/notext_ios_1024.png",
       infoPlist: {
         ITSAppUsesNonExemptEncryption: false
       }
@@ -26,7 +27,8 @@ export default {
     android: {
       package: "com.sjroy5.galageaux",
       adaptiveIcon: {
-        foregroundImage: "./assets/icon.png",
+        foregroundImage: "./assets/icons/notext_android_adaptive_fg.png",
+        backgroundImage: "./assets/icons/notext_android_adaptive_bg.png",
         backgroundColor: "#020617"
       }
     },

@@ -2,12 +2,16 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { Canvas, Rect, Circle } from '@shopify/react-native-skia';
 import GameScreen from './GameScreen';
+import AuthScreen from './AuthScreen';
 
 export default function MainMenu() {
   const { width, height } = useWindowDimensions();
   const [inGame, setInGame] = useState(false);
+  const [authVisible, setAuthVisible] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
 
-  if (inGame) return <GameScreen onExit={() => setInGame(false)} />;
+  if (inGame) return <GameScreen onExit={() => setInGame(false)} showTutorial={showTutorial} />;
+  if (authVisible) return <AuthScreen onClose={() => setAuthVisible(false)} />;
 
   return (
     <View style={styles.container}>
@@ -24,10 +28,16 @@ export default function MainMenu() {
         ))}
       </Canvas>
       <View style={styles.overlay}>
-        <Text style={styles.title}>GALAGA // MODERN</Text>
+        <Text style={styles.title}>GALAGEAUX</Text>
         <Text style={styles.subtitle}>Vertical neon space shooter</Text>
-        <TouchableOpacity style={styles.button} onPress={() => setInGame(true)}>
+        <TouchableOpacity style={styles.button} onPress={() => { setShowTutorial(false); setInGame(true); }}>
           <Text style={styles.buttonText}>PLAY</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.button, styles.tutorialButton]} onPress={() => { setShowTutorial(true); setInGame(true); }}>
+          <Text style={[styles.buttonText, styles.tutorialButtonText]}>SHOW ME HOW</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={() => setAuthVisible(true)}>
+          <Text style={[styles.buttonText, styles.secondaryButtonText]}>ACCOUNT</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -59,12 +69,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     paddingVertical: 14,
     backgroundColor: '#22c55e',
-    borderRadius: 999
+    borderRadius: 999,
+    marginTop: 12
   },
   buttonText: {
     color: '#020617',
     fontWeight: '800',
     fontSize: 16,
     letterSpacing: 2
+  },
+  tutorialButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#38bdf8'
+  },
+  tutorialButtonText: {
+    color: '#38bdf8'
+  },
+  secondaryButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)'
+  },
+  secondaryButtonText: {
+    color: '#e5e7eb'
   }
 });
