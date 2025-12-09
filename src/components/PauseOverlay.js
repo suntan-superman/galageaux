@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
 
 export default function PauseOverlay({
   visible,
@@ -12,7 +12,15 @@ export default function PauseOverlay({
   tiltSensitivity,
   onChangeTiltSensitivity,
   fireButtonPosition,
-  onToggleFireButtonPosition
+  onToggleFireButtonPosition,
+  soundsEnabled,
+  musicEnabled,
+  soundVolume,
+  musicVolume,
+  onToggleSounds,
+  onToggleMusic,
+  onChangeSoundVolume,
+  onChangeMusicVolume
 }) {
   if (!visible) return null;
 
@@ -65,9 +73,73 @@ export default function PauseOverlay({
           </View>
         </View>
 
+        <TouchableOpacity style={styles.buttonSecondary} onPress={onToggleSounds}>
+          <Text style={styles.buttonSecondaryText}>
+            Sound FX: {soundsEnabled ? 'On' : 'Off'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.buttonSecondary} onPress={onToggleMusic}>
+          <Text style={styles.buttonSecondaryText}>
+            Music: {musicEnabled ? 'On' : 'Off'}
+          </Text>
+        </TouchableOpacity>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Sound Volume</Text>
+          <View style={styles.sensitivityRow}>
+            <TouchableOpacity
+              style={[styles.adjustButton, soundVolume <= 0 && styles.adjustButtonDisabled]}
+              onPress={() => onChangeSoundVolume(Math.max(0, soundVolume - 0.1))}
+              disabled={soundVolume <= 0}
+            >
+              <Text style={styles.adjustButtonText}>-</Text>
+            </TouchableOpacity>
+            <Text style={styles.sensitivityValue}>{Math.round(soundVolume * 100)}%</Text>
+            <TouchableOpacity
+              style={[styles.adjustButton, soundVolume >= 1 && styles.adjustButtonDisabled]}
+              onPress={() => onChangeSoundVolume(Math.min(1, soundVolume + 0.1))}
+              disabled={soundVolume >= 1}
+            >
+              <Text style={styles.adjustButtonText}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Music Volume</Text>
+          <View style={styles.sensitivityRow}>
+            <TouchableOpacity
+              style={[styles.adjustButton, musicVolume <= 0 && styles.adjustButtonDisabled]}
+              onPress={() => onChangeMusicVolume(Math.max(0, musicVolume - 0.1))}
+              disabled={musicVolume <= 0}
+            >
+              <Text style={styles.adjustButtonText}>-</Text>
+            </TouchableOpacity>
+            <Text style={styles.sensitivityValue}>{Math.round(musicVolume * 100)}%</Text>
+            <TouchableOpacity
+              style={[styles.adjustButton, musicVolume >= 1 && styles.adjustButtonDisabled]}
+              onPress={() => onChangeMusicVolume(Math.min(1, musicVolume + 0.1))}
+              disabled={musicVolume >= 1}
+            >
+              <Text style={styles.adjustButtonText}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <TouchableOpacity style={styles.exitButton} onPress={onExit}>
           <Text style={styles.exitButtonText}>Quit to Menu</Text>
         </TouchableOpacity>
+
+        <View style={styles.legalLinks}>
+          <TouchableOpacity onPress={() => Linking.openURL('https://galageaux.com/terms')}>
+            <Text style={styles.legalLinkText}>Terms of Service</Text>
+          </TouchableOpacity>
+          <Text style={styles.legalLinkSeparator}>•</Text>
+          <TouchableOpacity onPress={() => Linking.openURL('https://galageaux.com/privacy')}>
+            <Text style={styles.legalLinkText}>Privacy Policy</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -181,6 +253,22 @@ const styles = StyleSheet.create({
     color: '#f87171',
     fontSize: 14,
     textDecorationLine: 'underline'
+  },
+  legalLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    gap: 8
+  },
+  legalLinkText: {
+    color: '#38bdf8',
+    fontSize: 12,
+    textDecorationLine: 'underline'
+  },
+  legalLinkSeparator: {
+    color: 'rgba(148,163,184,0.5)',
+    fontSize: 12
   }
 });
 

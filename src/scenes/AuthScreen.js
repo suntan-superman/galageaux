@@ -9,7 +9,8 @@ import {
   Platform,
   ScrollView,
   Alert,
-  useWindowDimensions
+  useWindowDimensions,
+  Linking
 } from 'react-native';
 import LiquidGlassBackground from '../components/LiquidGlassBackground';
 import LiquidGlassCard from '../components/LiquidGlassCard';
@@ -235,7 +236,20 @@ export default function AuthScreen({ onClose }) {
 
           <View style={styles.footer}>
             <Text style={styles.termsText}>
-              By signing in, you agree to our Terms of Service and Privacy Policy
+              By signing in, you agree to our{' '}
+              <Text 
+                style={styles.linkText} 
+                onPress={() => Linking.openURL('https://galageaux.com/terms')}
+              >
+                Terms of Service
+              </Text>
+              {' '}and{' '}
+              <Text 
+                style={styles.linkText} 
+                onPress={() => Linking.openURL('https://galageaux.com/privacy')}
+              >
+                Privacy Policy
+              </Text>
             </Text>
             <Text style={styles.copyrightText}>
               Galageaux © 2025
@@ -350,6 +364,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 8,
     paddingHorizontal: 20
+  },
+  linkText: {
+    color: '#38bdf8',
+    textDecorationLine: 'underline',
+    fontWeight: '600'
   },
   copyrightText: {
     fontSize: 10,
