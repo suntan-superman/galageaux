@@ -1,52 +1,69 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, PanResponder, useWindowDimensions, Text, TouchableOpacity } from 'react-native';
-import { Canvas, Rect, Circle, Group, Path, LinearGradient, vec } from '@shopify/react-native-skia';
-import { Accelerometer } from 'expo-sensors';
+import { View, StyleSheet, useWindowDimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Canvas } from '@shopify/react-native-skia';
 import wavesConfig from '../config/waves.json';
 import enemiesConfig from '../config/enemies.json';
-import { aabb } from '../engine/collision';
 import { diveOffset } from '../engine/paths';
 import { spawnExplosionParticles, updateParticles, spawnExplosion, updateExplosion } from '../engine/particles';
 import { createScreenshake, triggerScreenshake, updateScreenshake } from '../engine/screenshake';
-import { getFormationOffsets, createFormation, updateFormation } from '../engine/formations';
 import { createBoss, updateBoss, bossCurrentPattern } from '../engine/boss';
 import { startSwoop, updateSwoop } from '../engine/swoops';
-import { POWERUP_TYPES, createPowerup, updatePowerup, applyPowerupEffect, getPowerupColor } from '../engine/powerups';
+import { POWERUP_TYPES, createPowerup, updatePowerup, applyPowerupEffect } from '../engine/powerups';
+import { spawnWave as spawnWaveFromModule, spawnFormation, spawnSingleEnemy, createEnemyBullet } from '../engine/spawner';
+import { checkBulletEnemyCollisions, checkBulletBossCollisions, checkEnemyBulletPlayerCollisions, checkPowerupCollisions } from '../engine/collisionHandlers';
 import { generateBossBullets } from '../engine/boss-patterns';
+import {
+  limitParticles,
+  limitExplosions,
+  limitPlayerBullets,
+  limitEnemyBullets,
+  limitEnemies,
+  limitPowerups,
+  limitScoreTexts
+} from '../engine/entityLimits';
+import {
+  getLevelTarget,
+  getDifficultyMultiplier,
+  calculateSpawnInterval,
+  calculateMaxEnemies,
+  calculateEnemySpeed,
+  calculateEnemyBulletSpeed,
+  calculateDifficultySettings
+} from '../engine/difficulty';
 import * as AudioManager from '../engine/audio';
-import BossHealthBar from '../components/BossHealthBar';
+import * as AchievementManager from '../engine/achievements';
 import PauseOverlay from '../components/PauseOverlay';
 import ControlHintsOverlay from '../components/ControlHintsOverlay';
+import AchievementToast from '../components/AchievementToast';
+import GameHUD from '../components/GameHUD';
+import FireButton from '../components/FireButton';
+import ScorePopup from '../components/ScorePopup';
+import LevelBanner from '../components/LevelBanner';
+import BonusBanner from '../components/BonusBanner';
+import StageCompleteOverlay from '../components/StageCompleteOverlay';
+import HitFlash from '../components/HitFlash';
+import {
+  Background,
+  StarField,
+  PlayerShip,
+  Enemies,
+  BossShip,
+  PlayerBullets,
+  EnemyBullets,
+  MuzzleFlashes,
+  Explosions,
+  Particles,
+  Powerups
+} from '../components/canvas';
 import { PLAYER_WIDTH, PLAYER_HEIGHT, ENEMY_SIZE, BULLET_WIDTH, BULLET_HEIGHT, POWERUP_SIZE } from '../entities/types';
 import GameOverOverlay from './GameOverOverlay';
+import { STAGES, STORAGE_KEYS, VISUAL, PLAYER as PLAYER_CONSTANTS, BOSS as BOSS_CONSTANTS, GAMEPLAY } from '../constants/game';
+import useGameSettings from '../hooks/useGameSettings';
+import useStarField from '../hooks/useStarField';
+import usePlayerControls from '../hooks/usePlayerControls';
 
-const STAGE = 'stage1';
-const STAR_COLORS = ['56,189,248', '248,250,252', '244,114,182'];
-const STORAGE_KEYS = {
-  tiltSensitivity: 'galageaux:tiltSensitivity',
-  fireButtonPosition: 'galageaux:fireButtonPosition',
-  audioSettings: 'galageaux:audioSettings'
-};
-
-const getLevelTarget = (level) => {
-  // Easier early levels, gradually increasing
-  if (level === 1) return 4;
-  if (level === 2) return 6;
-  if (level === 3) return 8;
-  return 6 + level * 3; // Original formula for levels 4+
-};
-
-const createStarField = (width, height, count = 70) =>
-  Array.from({ length: count }).map((_, idx) => ({
-    id: `star-${idx}-${Math.random()}`,
-    x: Math.random() * width,
-    y: Math.random() * height,
-    size: Math.random() * 2 + 0.6,
-    speed: 20 + Math.random() * 40,
-    color: STAR_COLORS[Math.floor(Math.random() * STAR_COLORS.length)],
-    twinkleOffset: Math.random() * Math.PI * 2
-  }));
+const STAR_COLORS = VISUAL.STAR_COLORS;
 
 export default function GameScreen({ onExit, showTutorial = false }) {
   const { width, height } = useWindowDimensions();
@@ -83,23 +100,39 @@ export default function GameScreen({ onExit, showTutorial = false }) {
   const [playerHitFlash, setPlayerHitFlash] = useState(0);
   const [hudPulse, setHudPulse] = useState(0);
   const [muzzleFlashes, setMuzzleFlashes] = useState([]);
-const [stars, setStars] = useState(() => createStarField(width, height));
+const { stars, updateStars, resetStars } = useStarField(width, height);
 const [tiltControlEnabled, setTiltControlEnabled] = useState(true);
 const [initialWaveSpawned, setInitialWaveSpawned] = useState(false);
-const [tiltSensitivity, setTiltSensitivity] = useState(5);
-const [fireButtonPosition, setFireButtonPosition] = useState('right');
 const [level, setLevel] = useState(1);
 const [levelKills, setLevelKills] = useState(0);
 const [levelBanner, setLevelBanner] = useState(null);
   const bonusTimerRef = useRef(0);
   const [bonusTimeLeft, setBonusTimeLeft] = useState(0);
 const [inBonusRound, setInBonusRound] = useState(false);
-  const [audioSettings, setAudioSettings] = useState({
-    soundsEnabled: true,
-    musicEnabled: true,
-    soundVolume: 0.7,
-    musicVolume: 0.5
+const [currentStage, setCurrentStage] = useState('stage1');
+const [stageComplete, setStageComplete] = useState(false);
+  const [achievementToast, setAchievementToast] = useState(null);
+  const [sessionStats, setSessionStats] = useState({
+    enemiesKilled: 0,
+    bossesDefeated: 0,
+    powerupsCollected: 0,
+    maxCombo: 0,
+    levelsCompleted: 0,
+    hitsTaken: 0
   });
+
+  // Use the game settings hook for persisted settings
+  const {
+    tiltSensitivity,
+    fireButtonPosition,
+    audioSettings,
+    handleTiltSensitivityChange,
+    handleFireButtonPositionChange,
+    handleToggleSounds,
+    handleToggleMusic,
+    handleChangeSoundVolume,
+    handleChangeMusicVolume
+  } = useGameSettings();
 
   const lastTimeRef = useRef(Date.now());
   const fireCooldownRef = useRef(0);
@@ -107,11 +140,9 @@ const [inBonusRound, setInBonusRound] = useState(false);
   const totalEnemiesSpawnedRef = useRef(0);
   const screenshake = useRef(createScreenshake());
   const screenOffset = useRef({ ox: 0, oy: 0 });
-  const stageConfig = wavesConfig[STAGE];
+  const stageConfig = wavesConfig[currentStage] || wavesConfig['stage1'];
   const playerRef = useRef(player);
   const pausedRef = useRef(false);
-  const tiltCurrent = useRef(0);
-  const tiltTarget = useRef(0);
   const bulletsRef = useRef(bullets);
   const enemyBulletsRef = useRef(enemyBullets);
   const enemiesRef = useRef(enemies);
@@ -119,39 +150,17 @@ const [inBonusRound, setInBonusRound] = useState(false);
   const particlesRef = useRef(particles);
   const powerupsRef = useRef(powerups);
   const bossRef = useRef(boss);
-const levelTarget = getLevelTarget(level);
-const bonusMultiplier = inBonusRound ? 1.5 : 1;
-
-// Gentler difficulty curve - easier early levels
-const getDifficultyMultiplier = (level) => {
-  // Level 1: 0.6x (much easier)
-  // Level 2: 0.7x (easier)
-  // Level 3: 0.8x (slightly easier)
-  // Level 4+: gradual increase
-  if (level === 1) return 0.6;
-  if (level === 2) return 0.7;
-  if (level === 3) return 0.8;
-  if (level === 4) return 0.9;
-  // Levels 5+ use progressive scaling
-  return Math.min(1.0, 0.9 + (level - 4) * 0.05);
-};
-
-const difficultyMultiplier = getDifficultyMultiplier(level);
-const bonusFactor = inBonusRound ? 0.6 : 1;
-
-// Spawn interval: longer intervals in early levels (fewer enemies)
-const baseSpawnInterval = stageConfig.spawnInterval / difficultyMultiplier;
-const levelSpawnInterval = Math.max(0.5, (baseSpawnInterval - (level - 1) * 0.03) * bonusFactor);
-
-// Max enemies: fewer enemies in early levels
-const baseMaxEnemies = Math.floor(stageConfig.maxEnemies * difficultyMultiplier);
-const levelMaxEnemies = Math.max(3, baseMaxEnemies + Math.floor((level - 1) * 2)) + (inBonusRound ? 3 : 0);
-
-// Enemy speed: slower in early levels
-const levelEnemySpeed = stageConfig.enemySpeed * difficultyMultiplier * (1 + (level - 1) * 0.08) * (inBonusRound ? 1.25 : 1);
-
-// Enemy bullet speed: slower in early levels
-const levelEnemyBulletSpeed = stageConfig.enemyBulletSpeed * difficultyMultiplier * (1 + (level - 1) * 0.06);
+// Calculate all difficulty settings from centralized module
+const difficultySettings = calculateDifficultySettings(stageConfig, level, inBonusRound);
+const {
+  levelTarget,
+  difficultyMultiplier,
+  bonusMultiplier,
+  spawnInterval: levelSpawnInterval,
+  maxEnemies: levelMaxEnemies,
+  enemySpeed: levelEnemySpeed,
+  enemyBulletSpeed: levelEnemyBulletSpeed
+} = difficultySettings;
 
   useEffect(() => {
     playerRef.current = player;
@@ -189,10 +198,6 @@ useEffect(() => {
   bossRef.current = boss;
 }, [boss]);
 
-  useEffect(() => {
-    setStars(createStarField(width, height));
-  }, [width, height]);
-
   // Initialize audio system
   useEffect(() => {
     let mounted = true;
@@ -202,7 +207,7 @@ useEffect(() => {
       
       // Load saved audio settings
       try {
-        const saved = await AsyncStorage.getItem(STORAGE_KEYS.audioSettings);
+        const saved = await AsyncStorage.getItem(STORAGE_KEYS.AUDIO_SETTINGS);
         if (saved && mounted) {
           const settings = JSON.parse(saved);
           AudioManager.setSoundsEnabled(settings.soundsEnabled);
@@ -228,39 +233,43 @@ useEffect(() => {
     };
   }, []);
 
+  // Initialize achievements system
+  useEffect(() => {
+    AchievementManager.loadAchievements();
+  }, []);
+
   // Update music tempo based on level
   useEffect(() => {
     AudioManager.setMusicTempo(level);
   }, [level]);
 
+  // Check and update achievements when session stats change
+  useEffect(() => {
+    const checkAchievements = async () => {
+      const newlyUnlocked = await AchievementManager.updateStats({
+        enemiesKilled: sessionStats.enemiesKilled,
+        bossesDefeated: sessionStats.bossesDefeated,
+        powerupsCollected: sessionStats.powerupsCollected,
+        maxCombo: sessionStats.maxCombo,
+        levelsCompleted: sessionStats.levelsCompleted,
+        perfectLevels: sessionStats.hitsTaken === 0 && sessionStats.levelsCompleted > 0 ? 1 : 0,
+        highScore: score
+      });
+      
+      // Show toast for newly unlocked achievements
+      if (newlyUnlocked && newlyUnlocked.length > 0) {
+        const achievement = newlyUnlocked[0];
+        setAchievementToast(achievement);
+        AudioManager.playSound('powerupCollect', 0.8); // Use powerup sound for achievement
+        setTimeout(() => setAchievementToast(null), 4000);
+      }
+    };
+    
+    checkAchievements();
+  }, [sessionStats, score]);
+
   useEffect(() => {
     setLevelBanner('LEVEL 01');
-  }, []);
-
-  useEffect(() => {
-    if (!levelBanner) return;
-    const t = setTimeout(() => setLevelBanner(null), 1500);
-    return () => clearTimeout(t);
-  }, [levelBanner]);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const storedSensitivity = await AsyncStorage.getItem(STORAGE_KEYS.tiltSensitivity);
-        if (storedSensitivity) {
-          const value = parseInt(storedSensitivity, 10);
-          if (!Number.isNaN(value)) {
-            setTiltSensitivity(Math.min(10, Math.max(1, value)));
-          }
-        }
-        const storedPosition = await AsyncStorage.getItem(STORAGE_KEYS.fireButtonPosition);
-        if (storedPosition && (storedPosition === 'left' || storedPosition === 'right')) {
-          setFireButtonPosition(storedPosition);
-        }
-      } catch (err) {
-        console.warn('Failed to load settings', err);
-      }
-    })();
   }, []);
 
   useEffect(() => {
@@ -271,40 +280,18 @@ useEffect(() => {
     }
   }, [showGuide, initialWaveSpawned, enemies.length]);
 
-useEffect(() => {
-  if (!tiltControlEnabled) {
-    tiltCurrent.current = 0;
-    tiltTarget.current = 0;
-    return;
-  }
-  Accelerometer.setUpdateInterval(16);
-  const sub = Accelerometer.addListener(({ x }) => {
-    tiltTarget.current = x;
+  // Use player controls hook for tilt and touch input
+  const { panHandlers, updateTilt } = usePlayerControls({
+    width,
+    playerWidth: PLAYER_WIDTH,
+    tiltEnabled: tiltControlEnabled,
+    tiltSensitivity,
+    isPaused,
+    isAlive: player.alive,
+    gameOver,
+    inBonusRound,
+    onPositionChange: (newX) => setPlayer(prev => ({ ...prev, x: newX }))
   });
-  return () => {
-    sub && sub.remove();
-  };
-}, [tiltControlEnabled, width]);
-
-  const clampPlayerX = (value) => {
-    const half = playerRef.current.width / 2;
-    return Math.max(0, Math.min(width - playerRef.current.width, value - half));
-  };
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => !tiltControlEnabled && !pausedRef.current && playerRef.current.alive && !gameOver,
-      onMoveShouldSetPanResponder: () => !tiltControlEnabled && !pausedRef.current && playerRef.current.alive && !gameOver,
-      onPanResponderMove: (_evt, gesture) => {
-        if (pausedRef.current) return;
-        const nextX = clampPlayerX(gesture.moveX);
-        setPlayer(prev => ({
-          ...prev,
-          x: nextX
-        }));
-      }
-    })
-  ).current;
 
   useEffect(() => {
     let id;
@@ -319,8 +306,41 @@ useEffect(() => {
     return () => cancelAnimationFrame(id);
   }, [isPaused, gameOver, player.alive, bossSpawned]);
 
+  /**
+   * Main Game Loop Step Function
+   * ============================
+   * Called every frame (~60fps) to update all game state.
+   * 
+   * @param {number} dt - Delta time in seconds since last frame (typically ~0.016s at 60fps)
+   * 
+   * Frame Lifecycle:
+   * 1. EARLY EXIT CHECK - Game over conditions
+   * 2. SCREEN EFFECTS - Update screenshake offset
+   * 3. SNAPSHOT STATE - Capture refs for consistent frame processing
+   * 4. UI TIMERS - Decay visual effects (hit flash, HUD pulse, muzzle flashes, combo)
+   * 5. BACKGROUND - Update parallax star field
+   * 6. INPUT PROCESSING - Handle tilt controls and auto-fire
+   * 7. ENTITY MOVEMENT - Update positions of all game entities:
+   *    - Player bullets (move up)
+   *    - Enemy bullets (move down/directional)
+   *    - Particles/explosions (physics + decay)
+   *    - Powerups (fall down)
+   *    - Enemies (patterns: normal, zigzag, dive, chase, swoop)
+   * 8. ENEMY AI - Enemy shooting logic with cooldowns
+   * 9. SPAWNING - Spawn new enemies/boss based on progression
+   * 10. COLLISION DETECTION - Check all collision types:
+   *     - Player bullets vs enemies → score, explosions, powerups
+   *     - Player bullets vs boss → damage, stage progression
+   *     - Enemy bullets vs player → damage, game over check
+   *     - Player vs powerups → apply effects
+   * 11. STATE COMMIT - Update all React state with new values
+   * 12. PROGRESSION - Level advancement, bonus rounds
+   */
   const step = (dt) => {
-    // Safety check: if player has no lives left, trigger game over
+    // ═══════════════════════════════════════════════════════════════════
+    // SECTION 1: EARLY EXIT CHECK
+    // Prevent further processing if player is dead
+    // ═══════════════════════════════════════════════════════════════════
     if (playerRef.current.lives <= 0 && playerRef.current.alive) {
       setPlayer(prev => ({ ...prev, alive: false }));
       setGameOver(true);
@@ -328,9 +348,18 @@ useEffect(() => {
       return;
     }
     
+    // ═══════════════════════════════════════════════════════════════════
+    // SECTION 2: SCREEN EFFECTS
+    // Update screenshake and store offset for rendering
+    // ═══════════════════════════════════════════════════════════════════
     const { ox, oy } = updateScreenshake(screenshake.current, dt);
     screenOffset.current = { ox, oy };
 
+    // ═══════════════════════════════════════════════════════════════════
+    // SECTION 3: SNAPSHOT STATE
+    // Capture current state from refs for consistent frame processing
+    // (refs are used to avoid stale closures in the game loop)
+    // ═══════════════════════════════════════════════════════════════════
     const currentBullets = bulletsRef.current;
     const currentEnemyBullets = enemyBulletsRef.current;
     const currentEnemies = enemiesRef.current;
@@ -339,9 +368,15 @@ useEffect(() => {
     const currentPowerups = powerupsRef.current;
     const currentBoss = bossRef.current;
 
-    setPlayerHitFlash(prev => (prev > 0 ? Math.max(0, prev - dt * 2.5) : 0));
-    setHudPulse(prev => (prev > 0 ? Math.max(0, prev - dt * 2) : 0));
+    // ═══════════════════════════════════════════════════════════════════
+    // SECTION 4: UI TIMERS
+    // Decay visual effects over time (all use dt for frame-rate independence)
+    // ═══════════════════════════════════════════════════════════════════
+    setPlayerHitFlash(prev => (prev > 0 ? Math.max(0, prev - dt * 2.5) : 0));  // ~0.4s decay
+    setHudPulse(prev => (prev > 0 ? Math.max(0, prev - dt * 2) : 0));          // ~0.5s decay
     setMuzzleFlashes(prev => prev.map(mf => ({ ...mf, life: mf.life - dt })).filter(mf => mf.life > 0));
+    
+    // Combo timer: resets combo to 0 when timer expires
     setComboTimer(prev => {
       const next = Math.max(0, prev - dt);
       if (next === 0 && prev > 0) {
@@ -351,33 +386,24 @@ useEffect(() => {
       return next;
     });
 
-    setStars(prev => prev.map(star => {
-      let nextY = star.y + star.speed * dt;
-      let nextX = star.x;
-      if (nextY > height) {
-        nextY = -5;
-        nextX = Math.random() * width;
-      }
-      const twinkle = 0.5 + 0.5 * Math.sin((Date.now() / 600) + star.twinkleOffset);
-      return { ...star, y: nextY, x: nextX, twinkle };
-    }));
+    // ═══════════════════════════════════════════════════════════════════
+    // SECTION 5: BACKGROUND
+    // Update parallax star field (delegated to useStarField hook)
+    // ═══════════════════════════════════════════════════════════════════
+    updateStars(dt);
 
     const currentPlayer = playerRef.current;
 
-    if (tiltControlEnabled && currentPlayer.alive) {
-      const smoothed = tiltCurrent.current * 0.85 + tiltTarget.current * 0.15;
-      tiltCurrent.current = smoothed;
-      const sensitivityFactor = tiltSensitivity / 5;
-      const bonusFactor = inBonusRound ? 1.25 : 1;
-      const delta = -smoothed * width * dt * 2.1 * sensitivityFactor * bonusFactor;
-      if (Math.abs(delta) > 0.05) {
-        setPlayer(prev => {
-          const nextX = Math.max(0, Math.min(width - prev.width, prev.x + delta));
-          return nextX === prev.x ? prev : { ...prev, x: nextX };
-        });
-      }
+    // ═══════════════════════════════════════════════════════════════════
+    // SECTION 6: INPUT PROCESSING
+    // Handle accelerometer-based tilt controls and auto-fire
+    // ═══════════════════════════════════════════════════════════════════
+    const newTiltX = updateTilt(dt, currentPlayer.x);
+    if (newTiltX !== null) {
+      setPlayer(prev => ({ ...prev, x: newTiltX }));
     }
 
+    // Fire cooldown management and auto-fire trigger
     if (fireCooldownRef.current > 0) {
       fireCooldownRef.current = Math.max(0, fireCooldownRef.current - dt);
       if (fireCooldownRef.current === 0) setCanFire(true);
@@ -385,24 +411,35 @@ useEffect(() => {
       fireWeapon(true);
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    // SECTION 7: ENTITY MOVEMENT
+    // Update positions of all game entities using delta time
+    // ═══════════════════════════════════════════════════════════════════
+    
+    // Score text floats upward and fades out
     setScoreTexts(prev =>
       prev
         .map(st => ({ ...st, y: st.y - dt * 50, life: st.life - dt }))
         .filter(st => st.life > 0)
     );
 
+    // Update particles and explosions (physics handled by engine modules)
     let updatedParticles = updateParticles(currentParticles, dt);
     let updatedExplosions = currentExplosions
       .map(ex => updateExplosion(ex, dt))
       .filter(ex => ex && ex.life > 0);
+    
+    // Powerups fall downward, remove when off-screen or collected
     let fallingPowerups = currentPowerups
       .map(p => updatePowerup(p, dt))
       .filter(p => p.y < height + p.size && !p.collected);
 
+    // Player bullets move upward at their speed
     const movedPlayerBullets = currentBullets
       .map(b => ({ ...b, y: b.y - b.speed * dt }))
-      .filter(b => b.y + b.height > 0);
+      .filter(b => b.y + b.height > 0);  // Remove when off-screen
 
+    // Enemy bullets: directional (vx/vy) or straight down (speed only)
     let movedEnemyBullets = currentEnemyBullets
       .map(b => {
         if (b.vx !== undefined && b.vy !== undefined) {
@@ -412,14 +449,38 @@ useEffect(() => {
       })
       .filter(b => b.y - b.height < height && b.x > -b.width * 2 && b.x < width + b.width * 2);
 
+    // ═══════════════════════════════════════════════════════════════════
+    // SECTION 7b: ENEMY MOVEMENT & AI
+    // Process each enemy: movement patterns, swoop behavior, shooting
+    // ═══════════════════════════════════════════════════════════════════
     const enemyShots = [];
     const advancedEnemies = [];
     const spawnBuffer = [];
     let killsEarned = 0;
+    
     currentEnemies.forEach(e => {
       let y = e.y + e.speed * dt;
       let x = e.x;
-      if (e.pattern === 'zigzag') {
+      
+      // Kamikaze behavior: chase player directly
+      if (e.behavior === 'chase') {
+        const playerCenterX = currentPlayer.x + currentPlayer.width / 2;
+        const playerCenterY = currentPlayer.y + currentPlayer.height / 2;
+        const enemyCenterX = e.x + e.size / 2;
+        const enemyCenterY = e.y + e.size / 2;
+        
+        // Calculate direction to player
+        const dx = playerCenterX - enemyCenterX;
+        const dy = playerCenterY - enemyCenterY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist > 0) {
+          x = e.x + (dx / dist) * e.speed * dt;
+          y = e.y + (dy / dist) * e.speed * dt;
+        }
+      }
+      // Normal movement patterns
+      else if (e.pattern === 'zigzag') {
         const t = (height - y) / height;
         x = e.baseX + Math.sin((1 - t) * Math.PI * 4) * 40;
       } else if (e.pattern === 'dive') {
@@ -438,20 +499,31 @@ useEffect(() => {
         nextEnemy.fireCooldown = cooldown;
         if (cooldown <= 0 && nextEnemy.y > 0 && nextEnemy.y < height * 0.8) {
           enemyShots.push(makeEnemyBullet(nextEnemy));
-          // Easier early levels: enemies shoot less frequently
-          const baseCooldown = level <= 2 ? 2.5 : level <= 4 ? 1.8 : 1.2;
-          const randomVariation = level <= 2 ? 1.5 : level <= 4 ? 1.2 : 1.3;
-          nextEnemy.fireCooldown = baseCooldown + Math.random() * randomVariation;
+          
+          // Elite enemies have rapid fire
+          if (nextEnemy.type === 'elite') {
+            nextEnemy.fireCooldown = 0.4 + Math.random() * 0.3; // 0.4-0.7s (much faster)
+          } else {
+            // Easier early levels: enemies shoot less frequently
+            const baseCooldown = level <= 2 ? 2.5 : level <= 4 ? 1.8 : 1.2;
+            const randomVariation = level <= 2 ? 1.5 : level <= 4 ? 1.2 : 1.3;
+            nextEnemy.fireCooldown = baseCooldown + Math.random() * randomVariation;
+          }
         }
       }
 
       advancedEnemies.push(nextEnemy);
     });
 
+    // Add any new enemy bullets to the pool
     if (enemyShots.length) {
       movedEnemyBullets = movedEnemyBullets.concat(enemyShots);
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    // SECTION 8: SPAWNING
+    // Spawn new enemies based on timer, or boss when enemy quota reached
+    // ═══════════════════════════════════════════════════════════════════
     if (!bossSpawned) {
       enemySpawnTimerRef.current += dt;
       if (
@@ -465,203 +537,191 @@ useEffect(() => {
       }
     }
 
+    // Boss spawning: when enough enemies defeated, spawn stage boss
     let upcomingBoss = currentBoss;
     if (!bossSpawned && totalEnemiesSpawnedRef.current >= stageConfig.maxEnemies) {
-      upcomingBoss = createBoss(STAGE, width);
+      upcomingBoss = createBoss(currentStage, width);
       setBossSpawned(true);
       AudioManager.playSound('bossAppear', 0.9);
       AudioManager.playMusic('boss');
       triggerScreenshake(screenshake.current, 12, 0.4);
     }
 
+    // Boss AI: movement and attack pattern execution
     if (upcomingBoss && upcomingBoss.alive) {
-      upcomingBoss = updateBoss({ ...upcomingBoss }, dt, STAGE);
+      upcomingBoss = updateBoss({ ...upcomingBoss }, dt, currentStage);
       const playerCenterX = currentPlayer.x + currentPlayer.width / 2;
       const playerCenterY = currentPlayer.y + currentPlayer.height / 2;
       upcomingBoss.fireCooldown -= dt;
       if (upcomingBoss.fireCooldown <= 0) {
-        const pattern = bossCurrentPattern(upcomingBoss, STAGE);
+        const pattern = bossCurrentPattern(upcomingBoss, currentStage);
         movedEnemyBullets = movedEnemyBullets.concat(
-          generateBossBullets(upcomingBoss, pattern, STAGE, playerCenterX, playerCenterY)
+          generateBossBullets(upcomingBoss, pattern, currentStage, playerCenterX, playerCenterY)
         );
-        upcomingBoss.fireCooldown = 1.1;
+        upcomingBoss.fireCooldown = 1.1;  // Boss fires every 1.1 seconds
       }
     }
 
-    const bulletPool = movedPlayerBullets.slice();
-    const bulletConsumed = new Array(bulletPool.length).fill(false);
-    const survivingEnemies = [];
-    let scoreGain = 0;
+    // ═══════════════════════════════════════════════════════════════════
+    // SECTION 9: COLLISION DETECTION
+    // Check all collision types and handle effects
+    // ═══════════════════════════════════════════════════════════════════
     let extraPowerups = [];
-    let newExplosions = [];
-    let newParticles = [];
     let scoreTextAdds = [];
-
-    advancedEnemies.forEach(enemy => {
-      let hitIndex = -1;
-      for (let i = 0; i < bulletPool.length; i++) {
-        const bullet = bulletPool[i];
-        if (!bullet || bulletConsumed[i]) continue;
-        if (
-          aabb(
-            { x: bullet.x, y: bullet.y, width: bullet.width, height: bullet.height },
-            { x: enemy.x, y: enemy.y, width: enemy.size, height: enemy.size }
-          )
-        ) {
-          hitIndex = i;
-          break;
+    
+    // 9a: Player bullets vs enemies
+    const enemyCollisionResult = checkBulletEnemyCollisions(
+      movedPlayerBullets,
+      advancedEnemies,
+      {
+        comboCount: comboRef.current,
+        bonusMultiplier,
+        onEnemyDestroyed: (enemy, currentCombo, points) => {
+          // Play sound
+          AudioManager.playSound('enemyDestroy', 0.5);
+          
+          // Update combo state
+          comboRef.current = currentCombo;
+          setCombo(currentCombo);
+          setComboTimer(1.5);  // Combo expires after 1.5 seconds of no kills
+          
+          // Show combo text for combos of 2+
+          if (currentCombo >= 2) {
+            AudioManager.playSound('comboIncrease', 0.6);
+            scoreTextAdds.push({
+              x: width / 2,
+              y: height * 0.2,
+              text: `${currentCombo}x COMBO!`,
+              color: currentCombo >= 5 ? '#fbbf24' : currentCombo >= 3 ? '#fb923c' : '#22c55e',
+              life: 1.2,
+              id: Date.now() + Math.random() + 10000,
+              isCombo: true
+            });
+          }
+          
+          // Track achievement stats
+          setSessionStats(prev => ({
+            ...prev,
+            enemiesKilled: prev.enemiesKilled + 1,
+            maxCombo: Math.max(prev.maxCombo, currentCombo)
+          }));
+          
+          // Chance to spawn powerup
+          if (Math.random() < 0.1) {
+            const centerX = enemy.x + enemy.size / 2;
+            const centerY = enemy.y + enemy.size / 2;
+            extraPowerups.push(createPowerup(centerX - POWERUP_SIZE / 2, centerY, randomPowerupKind()));
+          }
         }
       }
-
-      if (hitIndex >= 0) {
-        bulletConsumed[hitIndex] = true;
-        const centerX = enemy.x + enemy.size / 2;
-        const centerY = enemy.y + enemy.size / 2;
-        newExplosions.push(spawnExplosion(centerX, centerY, 26, 0.25));
-        newParticles.push(...spawnExplosionParticles(centerX, centerY, 12, 'default'));
-        AudioManager.playSound('enemyDestroy', 0.5);
-        const cfg = enemiesConfig[enemy.type] || enemiesConfig['grunt'];
-        
-        // Combo tracking
-        comboRef.current += 1;
-        const currentCombo = comboRef.current;
-        setCombo(currentCombo);
-        setComboTimer(1.5); // Reset combo timer to 1.5 seconds
-        
-        // Show combo text for combos of 2 or more
-        if (currentCombo >= 2) {
-          AudioManager.playSound('comboIncrease', 0.6);
-          scoreTextAdds.push({
-            x: width / 2,
-            y: height * 0.2,
-            text: `${currentCombo}x COMBO!`,
-            color: currentCombo >= 5 ? '#fbbf24' : currentCombo >= 3 ? '#fb923c' : '#22c55e',
-            life: 1.2,
-            id: Date.now() + Math.random() + 10000,
-            isCombo: true
-          });
-        }
-        
-        // Bonus score for combos
-        const comboMultiplier = currentCombo >= 5 ? 2 : currentCombo >= 3 ? 1.5 : currentCombo >= 2 ? 1.25 : 1;
-        scoreGain += Math.floor(cfg.score * comboMultiplier);
-        killsEarned += 1;
-        scoreTextAdds.push({
-          x: centerX,
-          y: centerY,
-          text: `+${Math.floor(cfg.score * comboMultiplier)}${currentCombo >= 2 ? ` (${currentCombo}x)` : ''}`,
-          color: currentCombo >= 5 ? '#fbbf24' : currentCombo >= 3 ? '#fb923c' : '#22c55e',
-          life: 1,
-          id: Date.now() + Math.random()
-        });
-        if (Math.random() < 0.1) {
-          extraPowerups.push(createPowerup(centerX - POWERUP_SIZE / 2, centerY, randomPowerupKind()));
-        }
-      } else {
-        survivingEnemies.push(enemy);
-      }
-    });
-
-    if (newExplosions.length) {
+    );
+    
+    const { survivingBullets: bulletsAfterEnemies, survivingEnemies, results: enemyResults } = enemyCollisionResult;
+    let scoreGain = enemyResults.scoreGain || 0;
+    killsEarned += enemyResults.killsEarned || 0;
+    
+    // Merge collision effects into update pools
+    if (enemyResults.explosions?.length) {
       triggerScreenshake(screenshake.current, 4.5, 0.15);
-      updatedExplosions = updatedExplosions.concat(newExplosions);
-      if (newParticles.length) updatedParticles = updatedParticles.concat(newParticles);
+      updatedExplosions = updatedExplosions.concat(enemyResults.explosions);
+    }
+    if (enemyResults.particles?.length) {
+      updatedParticles = updatedParticles.concat(enemyResults.particles);
+    }
+    if (enemyResults.scoreTexts?.length) {
+      scoreTextAdds = scoreTextAdds.concat(enemyResults.scoreTexts);
     }
 
-    let survivingBullets = bulletPool.filter((b, idx) => b && !bulletConsumed[idx]);
+    let survivingBullets = bulletsAfterEnemies;
 
+    // 9b: Player bullets vs boss
     if (upcomingBoss && upcomingBoss.alive) {
-      const afterBoss = [];
-      let bossHits = 0;
-      survivingBullets.forEach(b => {
-        if (
-          aabb(
-            { x: b.x, y: b.y, width: b.width, height: b.height },
-            { x: upcomingBoss.x, y: upcomingBoss.y, width: upcomingBoss.width, height: upcomingBoss.height }
-          )
-        ) {
-          bossHits++;
-        } else {
-          afterBoss.push(b);
-        }
-      });
-      survivingBullets = afterBoss;
-
-      if (bossHits > 0) {
+      const bossResult = checkBulletBossCollisions(survivingBullets, upcomingBoss, screenshake.current);
+      survivingBullets = bossResult.survivingBullets;
+      upcomingBoss = bossResult.updatedBoss;
+      const bossRes = bossResult.results;
+      
+      if (bossRes.hitCount > 0) {
         AudioManager.playSound('enemyHit', 0.4);
-        const nextHp = upcomingBoss.hp - bossHits;
-            if (nextHp <= 0) {
-          const bossCenterX = upcomingBoss.x + upcomingBoss.width / 2;
-          const bossCenterY = upcomingBoss.y + upcomingBoss.height / 2;
-              triggerScreenshake(screenshake.current, 14, 0.6);
-          updatedExplosions.push(spawnExplosion(bossCenterX, bossCenterY, 80, 0.6));
-          updatedParticles = updatedParticles.concat(
-            spawnExplosionParticles(bossCenterX, bossCenterY, 40, 'debris')
-          );
-          AudioManager.playSound('bossDeath', 0.8);
-          scoreTextAdds.push({
-            x: bossCenterX,
-            y: bossCenterY,
-            text: '+1000',
-            color: '#fbbf24',
-            life: 1.5,
-            id: Date.now() + Math.random(),
-            isBoss: true
-          });
-          scoreGain += 1000;
-          upcomingBoss = { ...upcomingBoss, hp: 0, alive: false };
+      }
+      if (bossRes.particles?.length) {
+        updatedParticles = updatedParticles.concat(bossRes.particles);
+      }
+      if (bossRes.explosions?.length) {
+        updatedExplosions = updatedExplosions.concat(bossRes.explosions);
+      }
+      if (bossRes.scoreTexts?.length) {
+        scoreTextAdds = scoreTextAdds.concat(bossRes.scoreTexts);
+      }
+      scoreGain += bossRes.scoreGain || 0;
+      
+      // Boss defeated: handle stage progression
+      if (bossRes.bossDefeated) {
+        AudioManager.playSound('bossDeath', 0.8);
+        
+        // Track boss defeat achievement
+        setSessionStats(prev => ({
+          ...prev,
+          bossesDefeated: prev.bossesDefeated + 1
+        }));
+        
+        // Stage progression: advance to next stage after boss defeat
+        const currentStageIndex = STAGES.indexOf(currentStage);
+        if (currentStageIndex < STAGES.length - 1) {
+          const nextStage = STAGES[currentStageIndex + 1];
+          setStageComplete(true);
+          
+          // Delay stage transition for celebration effect
+          setTimeout(() => {
+            setCurrentStage(nextStage);
+            setBossSpawned(false);
+            totalEnemiesSpawnedRef.current = 0;
+            setEnemies([]);
+            setEnemyBullets([]);
+            setStageComplete(false);
+            AudioManager.playMusic('background');
+          }, 2000);
         } else {
-          upcomingBoss = { ...upcomingBoss, hp: nextHp };
+          // All stages complete - player wins!
+          setStageComplete(true);
         }
       }
     }
 
-    const playerRect = {
-      x: currentPlayer.x,
-      y: currentPlayer.y,
-      width: currentPlayer.width,
-      height: currentPlayer.height
-    };
-
-    let playerHit = false;
-    const enemyBulletsAfterPlayer = [];
-    // Player is invulnerable during bonus round
-    if (!inBonusRound) {
-      movedEnemyBullets.forEach(b => {
-        if (!playerHit && currentPlayer.alive && aabb(playerRect, b)) {
-          playerHit = true;
-        } else {
-          enemyBulletsAfterPlayer.push(b);
-        }
-      });
-    } else {
-      // During bonus round, just remove bullets without checking collision
-      enemyBulletsAfterPlayer.push(...movedEnemyBullets);
-    }
+    // 9c: Enemy bullets vs player
+    const { survivingBullets: enemyBulletsAfterPlayer, playerHit } = checkEnemyBulletPlayerCollisions(
+      movedEnemyBullets,
+      currentPlayer,
+      inBonusRound // Player is invulnerable during bonus round
+    );
     if (playerHit) handlePlayerHit();
 
-    const remainingPowerups = [];
-    fallingPowerups.forEach(p => {
-      if (currentPlayer.alive && aabb(playerRect, { x: p.x, y: p.y, width: p.size, height: p.size })) {
-            applyPowerup(p.kind);
-      } else {
-        remainingPowerups.push(p);
-      }
-    });
+    // 9d: Player vs powerups
+    const remainingPowerups = checkPowerupCollisions(fallingPowerups, currentPlayer, applyPowerup);
 
     const finalPowerups = extraPowerups.length ? remainingPowerups.concat(extraPowerups) : remainingPowerups;
 
-    setBullets(survivingBullets);
-    setEnemyBullets(enemyBulletsAfterPlayer);
-    setEnemies([...survivingEnemies, ...spawnBuffer]);
-    setExplosions(updatedExplosions);
-    setParticles(updatedParticles);
-    setPowerups(finalPowerups);
+    // ═══════════════════════════════════════════════════════════════════
+    // SECTION 10: STATE COMMIT
+    // Apply all calculated updates to React state with entity limits
+    // Limits prevent memory growth during extended play sessions
+    // ═══════════════════════════════════════════════════════════════════
+    setBullets(limitPlayerBullets(survivingBullets));
+    setEnemyBullets(limitEnemyBullets(enemyBulletsAfterPlayer));
+    setEnemies(limitEnemies([...survivingEnemies, ...spawnBuffer]));
+    setExplosions(limitExplosions(updatedExplosions));
+    setParticles(limitParticles(updatedParticles));
+    setPowerups(limitPowerups(finalPowerups));
     setBoss(upcomingBoss);
     if (scoreGain) setScore(prev => prev + scoreGain);
     if (scoreTextAdds.length) {
-      setScoreTexts(prev => [...prev, ...scoreTextAdds]);
+      setScoreTexts(prev => limitScoreTexts([...prev, ...scoreTextAdds]));
     }
+    
+    // ═══════════════════════════════════════════════════════════════════
+    // SECTION 11: BONUS ROUND TIMER
+    // Handle bonus round countdown and completion
+    // ═══════════════════════════════════════════════════════════════════
     if (inBonusRound) {
       setBonusTimeLeft(prev => {
         const next = Math.max(0, prev - dt);
@@ -689,6 +749,10 @@ useEffect(() => {
       });
     }
 
+    // ═══════════════════════════════════════════════════════════════════
+    // SECTION 12: LEVEL PROGRESSION
+    // Track kills and trigger level-up when target reached
+    // ═══════════════════════════════════════════════════════════════════
     if (killsEarned > 0 && !inBonusRound) {
       // Only count kills toward level progression when not in bonus round
       setLevelKills(prev => {
@@ -701,22 +765,49 @@ useEffect(() => {
             setLevelBanner(`LEVEL ${String(nextLevel).padStart(2, '0')}`);
             // Reset levelKills to 0 for the new level before triggering bonus
             setLevelKills(0);
+            
+            // Track level completion
+            setSessionStats(prev => ({
+              ...prev,
+              levelsCompleted: prev.levelsCompleted + 1
+            }));
+            
             triggerBonusRound();
             return 0; // Reset to 0, bonus round kills don't count
           }
-          return levelTarget;
+          return levelTarget;  // Max level reached
         }
         return total;
       });
     }
   };
+  // ═══════════════════════════════════════════════════════════════════════
+  // END OF STEP FUNCTION
+  // ═══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Select a random powerup type for enemy drops
+   * @returns {string} Powerup type key
+   */
   const randomPowerupKind = () => {
     const kinds = [POWERUP_TYPES.SPREAD_SHOT, POWERUP_TYPES.DOUBLE_SHOT, POWERUP_TYPES.TRIPLE_SHOT, POWERUP_TYPES.RAPID_FIRE, 'shield', 'slow'];
     return kinds[Math.floor(Math.random() * kinds.length)];
   };
 
+  /**
+   * Apply a collected powerup effect to the player
+   * @param {string} kind - Powerup type (from POWERUP_TYPES or 'shield'/'slow')
+   */
   const applyPowerup = (kind) => {
     AudioManager.playSound('powerupCollect', 0.7);
+    
+    // Track powerup collection
+    setSessionStats(prev => ({
+      ...prev,
+      powerupsCollected: prev.powerupsCollected + 1
+    }));
+    
+    // Weapon powerups: upgrade temporarily for 10 seconds
     if (kind === POWERUP_TYPES.SPREAD_SHOT || kind === POWERUP_TYPES.DOUBLE_SHOT || kind === POWERUP_TYPES.TRIPLE_SHOT || kind === POWERUP_TYPES.RAPID_FIRE) {
       setPlayer(prev => {
         const updated = applyPowerupEffect(prev, kind);
@@ -732,7 +823,7 @@ useEffect(() => {
             }
             return reset;
           });
-        }, 10000);
+        }, 10000);  // Powerup lasts 10 seconds
         return updated;
       });
     } else if (kind === 'shield') {
@@ -818,68 +909,18 @@ useEffect(() => {
     setBullets(prev => [...prev, ...b]);
   };
 
-  const spawnWave = () => {
-    const roll = Math.random();
-    if (roll < 0.3) return spawnFormation('v');
-    if (roll < 0.6) return spawnFormation('line');
-    return spawnSingleEnemy();
+  // Use spawner module with current config
+  const spawnConfig = {
+    width,
+    enemySpeed: levelEnemySpeed,
+    patterns: stageConfig.patterns
   };
-
-  const spawnFormation = (type) => {
-    const created = [];
-    const count = 5;
-    const offsets = getFormationOffsets(type, count);
-    const baseX = width / 2;
-    const yStart = -ENEMY_SIZE * 2;
-    offsets.forEach((off, idx) => {
-      const r = Math.random();
-      let typeKey = 'grunt', canShoot = false;
-      if (r > 0.7) { typeKey = 'shooter'; canShoot = true; }
-      else if (r > 0.4) { typeKey = 'dive'; canShoot = true; }
-      const cfg = enemiesConfig[typeKey] || enemiesConfig['grunt'];
-      const x = baseX + off.dx - ENEMY_SIZE / 2;
-      created.push({
-        type: typeKey,
-        x,
-        y: yStart + off.dy - idx * 8,
-        baseX: x,
-        size: ENEMY_SIZE,
-        speed: levelEnemySpeed,
-        hp: cfg.hp,
-        pattern: type === 'v' ? 'dive' : 'zigzag',
-        canShoot,
-        fireCooldown: Math.random() * 1.5 + 0.5
-      });
-      totalEnemiesSpawnedRef.current += 1;
-    });
-    return created;
+  
+  const handleSpawnCount = (count) => {
+    totalEnemiesSpawnedRef.current += count;
   };
-
-  const spawnSingleEnemy = () => {
-    const created = [];
-    const pad = 20;
-    const pattern = stageConfig.patterns[Math.floor(Math.random() * stageConfig.patterns.length)];
-    const r = Math.random();
-    let type = 'grunt', canShoot = false;
-    if (r > 0.7) { type = 'shooter'; canShoot = true; }
-    else if (r > 0.4) { type = 'dive'; canShoot = true; }
-    const cfg = enemiesConfig[type] || enemiesConfig['grunt'];
-    const x = pad + Math.random() * (width - pad * 2 - ENEMY_SIZE);
-    created.push({
-      type,
-      x,
-      y: -ENEMY_SIZE,
-      baseX: x,
-      size: ENEMY_SIZE,
-      speed: levelEnemySpeed,
-      hp: cfg.hp,
-      pattern,
-      canShoot,
-      fireCooldown: Math.random() * 1.5 + 0.5
-    });
-    totalEnemiesSpawnedRef.current += 1;
-    return created;
-  };
+  
+  const spawnWave = () => spawnWaveFromModule(spawnConfig, handleSpawnCount);
 
 
   const handleBossFire = (dt) => {
@@ -921,8 +962,15 @@ useEffect(() => {
     AudioManager.playSound('playerHit', 0.8);
     setPlayerHitFlash(1);
     setHudPulse(1);
-    setExplosions(prev => [...prev, spawnExplosion(playerCenterX, playerCenterY, 34, 0.4)]);
-    setParticles(prev => [...prev, ...spawnExplosionParticles(playerCenterX, playerCenterY, 24, 'default')]);
+    
+    // Track hit taken for achievement
+    setSessionStats(prev => ({
+      ...prev,
+      hitsTaken: prev.hitsTaken + 1
+    }));
+    
+    setExplosions(prev => [...prev, spawnExplosion(playerCenterX, playerCenterY, 34, 0.4, '#3b82f6')]);
+    setParticles(prev => [...prev, ...spawnExplosionParticles(playerCenterX, playerCenterY, 30, 'energy', '#3b82f6')]);
     setScoreTexts(prev => [...prev, {
       x: playerCenterX,
       y: playerCenterY - 20,
@@ -951,6 +999,8 @@ useEffect(() => {
     comboRef.current = 0;
     setComboTimer(0);
     totalEnemiesSpawnedRef.current = 0;
+    setCurrentStage('stage1'); // Reset to first stage
+    setStageComplete(false);
     setPlayer({
       x: width / 2 - PLAYER_WIDTH / 2,
       y: height * 0.8,
@@ -971,7 +1021,7 @@ useEffect(() => {
     setHudPulse(0);
     setScoreTexts([]);
     setCanFire(true);
-    setStars(createStarField(width, height));
+    resetStars();
     setInitialWaveSpawned(false);
     enemySpawnTimerRef.current = 0;
     fireCooldownRef.current = 0;
@@ -996,60 +1046,6 @@ useEffect(() => {
 
   const handleAutoToggle = () => setAutoFire(prev => !prev);
 
-  const handleTiltSensitivityChange = async (nextValue) => {
-    setTiltSensitivity(nextValue);
-    try {
-      await AsyncStorage.setItem(STORAGE_KEYS.tiltSensitivity, String(nextValue));
-    } catch (err) {
-      console.warn('Failed to save tilt sensitivity', err);
-    }
-  };
-
-  const handleFireButtonPositionChange = async (position) => {
-    setFireButtonPosition(position);
-    try {
-      await AsyncStorage.setItem(STORAGE_KEYS.fireButtonPosition, position);
-    } catch (err) {
-      console.warn('Failed to save fire button position', err);
-    }
-  };
-
-  const handleToggleSounds = async () => {
-    const newValue = !audioSettings.soundsEnabled;
-    setAudioSettings(prev => ({ ...prev, soundsEnabled: newValue }));
-    AudioManager.setSoundsEnabled(newValue);
-    await saveAudioSettings({ ...audioSettings, soundsEnabled: newValue });
-  };
-
-  const handleToggleMusic = async () => {
-    const newValue = !audioSettings.musicEnabled;
-    setAudioSettings(prev => ({ ...prev, musicEnabled: newValue }));
-    await AudioManager.setMusicEnabled(newValue);
-    await saveAudioSettings({ ...audioSettings, musicEnabled: newValue });
-  };
-
-  const handleChangeSoundVolume = async (volume) => {
-    const rounded = Math.round(volume * 10) / 10;
-    setAudioSettings(prev => ({ ...prev, soundVolume: rounded }));
-    AudioManager.setSoundVolume(rounded);
-    await saveAudioSettings({ ...audioSettings, soundVolume: rounded });
-  };
-
-  const handleChangeMusicVolume = async (volume) => {
-    const rounded = Math.round(volume * 10) / 10;
-    setAudioSettings(prev => ({ ...prev, musicVolume: rounded }));
-    await AudioManager.setMusicVolume(rounded);
-    await saveAudioSettings({ ...audioSettings, musicVolume: rounded });
-  };
-
-  const saveAudioSettings = async (settings) => {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEYS.audioSettings, JSON.stringify(settings));
-    } catch (err) {
-      console.warn('Failed to save audio settings', err);
-    }
-  };
-
   const triggerBonusRound = () => {
     setInBonusRound(true);
     setBonusTimeLeft(10);
@@ -1068,9 +1064,6 @@ useEffect(() => {
   };
 
   const { ox, oy } = screenOffset.current;
-  const formattedScore = score.toLocaleString('en-US');
-  const livesDisplay = player.lives > 0 ? '❤'.repeat(player.lives) : '☠';
-  const shieldStatus = player.shield ? 'ONLINE' : 'OFFLINE';
   const hudScale = 1 + hudPulse * 0.08;
   const timestamp = Date.now();
   const flameLength = 20 + Math.sin(timestamp / 120) * 8;
@@ -1078,517 +1071,69 @@ useEffect(() => {
   const nebulaPulse = 0.25 + 0.2 * Math.sin(timestamp / 1500);
   const nebulaPulseAlt = 0.2 + 0.15 * Math.sin(timestamp / 1100 + 1);
   const fireButtonDisabled = !canFire || isPaused || gameOver || showGuide;
-  const autoBadgeText = autoFire ? 'AUTO ON' : 'MANUAL';
 
   return (
-    <View style={styles.container} {...panResponder.panHandlers}>
+    <View style={styles.container} {...panHandlers}>
       <Canvas style={styles.canvas}>
-        <Rect x={ox} y={oy} width={width} height={height} color="#010314" />
-        <Rect x={ox} y={oy} width={width} height={height * 0.65} color="rgba(15,23,42,0.75)" />
-        <Circle cx={width * 0.3 + ox} cy={height * 0.25 + oy} r={220} color={`rgba(14,165,233,${nebulaPulse})`} />
-        <Circle cx={width * 0.72 + ox} cy={height * 0.18 + oy} r={190} color={`rgba(244,114,182,${nebulaPulseAlt})`} />
-
-        {stars.map(star => {
-          const alpha = 0.35 + 0.65 * (star.twinkle ?? 0.5);
-          return (
-            <Circle
-              key={star.id}
-              cx={star.x + ox}
-              cy={star.y + oy}
-              r={star.size}
-              color={`rgba(${star.color},${alpha})`}
-            />
-          );
-        })}
-
-        {player.alive && (() => {
-          const centerX = player.x + player.width / 2 + ox;
-          const centerY = player.y + player.height / 2 + oy;
-          const shipX = player.x + ox;
-          const shipY = player.y + oy;
-          const shipW = player.width;
-          const shipH = player.height;
-          
-          // Enhanced ship design - sleek interceptor with multiple components
-          const noseTip = { x: centerX, y: shipY };
-          const noseWidth = shipW * 0.15;
-          const wingWidth = shipW * 0.45;
-          const bodyWidth = shipW * 0.25;
-          
-          // Main body path - diamond-shaped interceptor
-          const mainBodyPath = `M ${noseTip.x} ${noseTip.y} 
-            L ${noseTip.x - noseWidth} ${shipY + shipH * 0.25} 
-            L ${noseTip.x - wingWidth} ${shipY + shipH * 0.6} 
-            L ${noseTip.x - bodyWidth} ${shipY + shipH * 0.85} 
-            L ${noseTip.x - bodyWidth * 0.6} ${shipY + shipH} 
-            L ${noseTip.x + bodyWidth * 0.6} ${shipY + shipH} 
-            L ${noseTip.x + bodyWidth} ${shipY + shipH * 0.85} 
-            L ${noseTip.x + wingWidth} ${shipY + shipH * 0.6} 
-            L ${noseTip.x + noseWidth} ${shipY + shipH * 0.25} Z`;
-          
-          // Wing extensions
-          const leftWingPath = `M ${noseTip.x - wingWidth} ${shipY + shipH * 0.6} 
-            L ${noseTip.x - shipW * 0.5} ${shipY + shipH * 0.55} 
-            L ${noseTip.x - wingWidth * 0.9} ${shipY + shipH * 0.7} Z`;
-          
-          const rightWingPath = `M ${noseTip.x + wingWidth} ${shipY + shipH * 0.6} 
-            L ${noseTip.x + shipW * 0.5} ${shipY + shipH * 0.55} 
-            L ${noseTip.x + wingWidth * 0.9} ${shipY + shipH * 0.7} Z`;
-          
-          // Weapon pods on wings
-          const leftPodX = noseTip.x - shipW * 0.5;
-          const rightPodX = noseTip.x + shipW * 0.5;
-          const podY = shipY + shipH * 0.55;
-          
-          return (
-          <Group>
-              {/* Outer energy glow */}
-              <Circle cx={centerX} cy={centerY} r={26} color="rgba(34,197,94,0.12)" />
-              <Circle cx={centerX} cy={centerY} r={22} color="rgba(56,189,248,0.08)" />
-              
-              {/* Wing extensions (back layer) */}
-              <Path path={leftWingPath} color="rgba(16,185,129,0.4)">
-                <LinearGradient
-                  start={vec(noseTip.x - wingWidth, shipY + shipH * 0.6)}
-                  end={vec(noseTip.x - shipW * 0.5, shipY + shipH * 0.55)}
-                  colors={['rgba(16,185,129,0.5)', 'rgba(34,197,94,0.3)']}
-                />
-              </Path>
-              <Path path={rightWingPath} color="rgba(16,185,129,0.4)">
-                <LinearGradient
-                  start={vec(noseTip.x + wingWidth, shipY + shipH * 0.6)}
-                  end={vec(noseTip.x + shipW * 0.5, shipY + shipH * 0.55)}
-                  colors={['rgba(16,185,129,0.5)', 'rgba(34,197,94,0.3)']}
-                />
-              </Path>
-              
-              {/* Main ship body with multi-layer gradient */}
-              <Path path={mainBodyPath}>
-                <LinearGradient
-                  start={vec(centerX, shipY)}
-                  end={vec(centerX, shipY + shipH)}
-                  colors={['#10b981', '#22c55e', '#16a34a', '#15803d', '#166534']}
-                />
-              </Path>
-              
-              {/* Body detail lines */}
-              <Path 
-                path={`M ${centerX - bodyWidth * 0.5} ${shipY + shipH * 0.4} L ${centerX - bodyWidth * 0.5} ${shipY + shipH * 0.9}`} 
-                color="rgba(248,250,252,0.4)" 
-                style="stroke"
-                strokeWidth={1}
-              />
-              <Path 
-                path={`M ${centerX + bodyWidth * 0.5} ${shipY + shipH * 0.4} L ${centerX + bodyWidth * 0.5} ${shipY + shipH * 0.9}`} 
-                color="rgba(248,250,252,0.4)" 
-                style="stroke"
-                strokeWidth={1}
-              />
-              
-              {/* Wing highlights */}
-              <Path 
-                path={`M ${noseTip.x - wingWidth * 0.8} ${shipY + shipH * 0.5} L ${noseTip.x - shipW * 0.48} ${shipY + shipH * 0.52} L ${noseTip.x - wingWidth * 0.75} ${shipY + shipH * 0.65} Z`} 
-                color="rgba(248,250,252,0.45)" 
-              />
-              <Path 
-                path={`M ${noseTip.x + wingWidth * 0.8} ${shipY + shipH * 0.5} L ${noseTip.x + shipW * 0.48} ${shipY + shipH * 0.52} L ${noseTip.x + wingWidth * 0.75} ${shipY + shipH * 0.65} Z`} 
-                color="rgba(248,250,252,0.45)" 
-              />
-              
-              {/* Weapon pods on wings */}
-              <Circle cx={leftPodX} cy={podY} r={3.5} color="rgba(56,189,248,0.6)" />
-              <Circle cx={leftPodX} cy={podY} r={2} color="rgba(139,92,246,0.8)" />
-              <Circle cx={rightPodX} cy={podY} r={3.5} color="rgba(56,189,248,0.6)" />
-              <Circle cx={rightPodX} cy={podY} r={2} color="rgba(139,92,246,0.8)" />
-              
-              {/* Enhanced cockpit/canopy */}
-              <Circle cx={centerX} cy={shipY + shipH * 0.3} r={5} color="rgba(14,165,233,0.5)" />
-              <Circle cx={centerX} cy={shipY + shipH * 0.3} r={3.5} color="rgba(56,189,248,0.7)" />
-              <Circle cx={centerX} cy={shipY + shipH * 0.3} r={2} color="rgba(139,92,246,0.9)" />
-              {/* Cockpit reflection */}
-              <Circle cx={centerX - 1} cy={shipY + shipH * 0.28} r={1.2} color="rgba(248,250,252,0.6)" />
-              
-              {/* Nose detail */}
-              <Circle cx={centerX} cy={shipY + 2} r={2} color="rgba(56,189,248,0.8)" />
-              
-              {/* Engine exhaust ports */}
-              <Rect 
-                x={centerX - shipW * 0.18} 
-                y={shipY + shipH * 0.92} 
-                width={shipW * 0.08} 
-                height={shipH * 0.08} 
-                color="rgba(15,23,42,0.8)" 
-              />
-              <Rect 
-                x={centerX + shipW * 0.1} 
-                y={shipY + shipH * 0.92} 
-                width={shipW * 0.08} 
-                height={shipH * 0.08} 
-                color="rgba(15,23,42,0.8)" 
-              />
-              
-              {/* Main thruster - enhanced with multiple layers */}
-              <Rect
-                x={centerX - flameWidth / 2 + ox}
-                y={shipY + shipH + oy}
-                width={flameWidth}
-                height={flameLength}
-                color="rgba(14,165,233,0.8)"
-              >
-                <LinearGradient
-                  start={vec(centerX, shipY + shipH)}
-                  end={vec(centerX, shipY + shipH + flameLength)}
-                  colors={['rgba(14,165,233,0.9)', 'rgba(56,189,248,0.7)', 'rgba(139,92,246,0.4)', 'rgba(248,250,252,0.2)']}
-                />
-              </Rect>
-              
-              {/* Thruster core with pulsing effect */}
-              <Circle 
-                cx={centerX} 
-                cy={shipY + shipH + flameLength * 0.5 + oy} 
-                r={flameWidth * 0.45} 
-                color="rgba(248,250,252,0.7)" 
-              />
-              <Circle 
-                cx={centerX} 
-                cy={shipY + shipH + flameLength * 0.5 + oy} 
-                r={flameWidth * 0.25} 
-                color="rgba(139,92,246,0.9)" 
-              />
-              
-              {/* Side maneuvering thrusters - enhanced */}
-              <Rect
-                x={centerX - shipW * 0.32 - 2.5 + ox}
-                y={shipY + shipH * 0.72 + oy}
-                width={5}
-                height={flameLength * 0.5}
-                color="rgba(14,165,233,0.5)"
-              >
-                <LinearGradient
-                  start={vec(centerX - shipW * 0.32, shipY + shipH * 0.72)}
-                  end={vec(centerX - shipW * 0.32, shipY + shipH * 0.72 + flameLength * 0.5)}
-                  colors={['rgba(14,165,233,0.6)', 'rgba(56,189,248,0.4)', 'rgba(139,92,246,0.2)']}
-                />
-              </Rect>
-              <Rect
-                x={centerX + shipW * 0.27 - 2.5 + ox}
-                y={shipY + shipH * 0.72 + oy}
-                width={5}
-                height={flameLength * 0.5}
-                color="rgba(14,165,233,0.5)"
-              >
-                <LinearGradient
-                  start={vec(centerX + shipW * 0.27, shipY + shipH * 0.72)}
-                  end={vec(centerX + shipW * 0.27, shipY + shipH * 0.72 + flameLength * 0.5)}
-                  colors={['rgba(14,165,233,0.6)', 'rgba(56,189,248,0.4)', 'rgba(139,92,246,0.2)']}
-                />
-              </Rect>
-              
-              {/* Shield effect - enhanced */}
-            {player.shield && (
-                <>
-                  <Circle cx={centerX} cy={centerY} r={32} color="rgba(56,189,248,0.15)" />
-                  <Circle cx={centerX} cy={centerY} r={28} color="rgba(139,92,246,0.2)" />
-                  <Circle cx={centerX} cy={centerY} r={24} color="rgba(56,189,248,0.25)" />
-                </>
-            )}
-              
-              {/* Bonus round invulnerability effect */}
-              {inBonusRound && (
-                <>
-                  <Circle cx={centerX} cy={centerY} r={34} color="rgba(251,191,36,0.2)" />
-                  <Circle cx={centerX} cy={centerY} r={30} color="rgba(251,191,36,0.3)" />
-                  <Circle cx={centerX} cy={centerY} r={26} color="rgba(251,191,36,0.25)" />
-                </>
-              )}
-              
-              {/* Hit flash */}
-              {playerHitFlash > 0 && (
-                <>
-                  <Circle cx={centerX} cy={centerY} r={30} color={`rgba(248,113,113,${playerHitFlash * 0.4})`} />
-                  <Circle cx={centerX} cy={centerY} r={24} color={`rgba(248,113,113,${playerHitFlash * 0.6})`} />
-                </>
+        <Background 
+          width={width} 
+          height={height} 
+          ox={ox} 
+          oy={oy} 
+          nebulaPulse={nebulaPulse} 
+          nebulaPulseAlt={nebulaPulseAlt} 
+        />
+        <StarField stars={stars} ox={ox} oy={oy} />
+        
+        {player.alive && (
+          <PlayerShip
+            player={player}
+            ox={ox}
+            oy={oy}
+            flameLength={flameLength}
+            flameWidth={flameWidth}
+            inBonusRound={inBonusRound}
+            hitFlash={playerHitFlash}
+          />
         )}
-            </Group>
-          );
-        })()}
 
-        {/* Muzzle flashes */}
-        {muzzleFlashes.map((mf, i) => {
-          const alpha = Math.max(0, mf.life / 0.1);
-          return (
-            <Group key={`muzzle-${mf.id}`}>
-              <Circle cx={mf.x + ox} cy={mf.y + oy} r={12 * alpha} color={`rgba(248,250,252,${alpha * 0.8})`} />
-              <Circle cx={mf.x + ox} cy={mf.y + oy} r={8 * alpha} color={`rgba(56,189,248,${alpha * 0.9})`} />
-              <Circle cx={mf.x + ox} cy={mf.y + oy} r={5 * alpha} color={`rgba(139,92,246,${alpha})`} />
-            </Group>
-          );
-        })}
-
-        {bullets.map((b, i) => {
-          const bulletCenterX = b.x + b.width / 2 + ox;
-          const bulletCenterY = b.y + b.height / 2 + oy;
-          return (
-          <Group key={`pb-${i}`}>
-            {/* Bullet trail */}
-            <Circle cx={bulletCenterX} cy={bulletCenterY + 8} r={2} color="rgba(56,189,248,0.4)" />
-            <Circle cx={bulletCenterX} cy={bulletCenterY + 12} r={1.5} color="rgba(56,189,248,0.2)" />
-            {/* Outer glow */}
-            <Circle cx={bulletCenterX} cy={bulletCenterY} r={6} color="rgba(248,250,252,0.2)" />
-            {/* Main bullet body with gradient */}
-            <Rect x={b.x + ox} y={b.y + oy} width={b.width} height={b.height} color="#f8fafc" />
-            {/* Core glow */}
-            <Circle cx={bulletCenterX} cy={bulletCenterY} r={2.5} color="rgba(56,189,248,0.9)" />
-            <Circle cx={bulletCenterX} cy={bulletCenterY} r={1.5} color="rgba(139,92,246,1)" />
-          </Group>
-          );
-        })}
-
-        {enemyBullets.map((b, i) => (
-          <Group key={`eb-${i}`}>
-            <Circle cx={(b.x || 0) + b.width / 2 + ox} cy={(b.y || 0) + oy} r={5} color="rgba(249,115,22,0.25)" />
-            <Rect x={(b.x || 0) + ox} y={(b.y || 0) + oy} width={b.width} height={b.height} color="#fb923c" />
-          </Group>
-        ))}
-
-        {enemies.map((e, i) => {
-          const enemyCenterX = e.x + e.size / 2 + ox;
-          const enemyCenterY = e.y + e.size / 2 + oy;
-          const enemyColor = enemiesConfig[e.type]?.color || '#38bdf8';
-          const enemyGlow = e.type === 'shooter' ? 'rgba(249,115,22,0.3)' : e.type === 'dive' ? 'rgba(34,197,94,0.3)' : 'rgba(56,189,248,0.3)';
-          
-          return (
-          <Group key={`e-${i}`}>
-            {/* Outer glow */}
-            <Circle cx={enemyCenterX} cy={enemyCenterY} r={e.size / 2 + 8} color="rgba(15,23,42,0.6)" />
-            <Circle cx={enemyCenterX} cy={enemyCenterY} r={e.size / 2 + 4} color={enemyGlow} />
-            
-            {/* Enemy body with pattern */}
-            <Rect x={e.x + ox} y={e.y + oy} width={e.size} height={e.size} color={enemyColor} />
-            
-            {/* Inner detail - crosshair pattern for shooters */}
-            {e.canShoot && (
-              <>
-                <Rect 
-                  x={enemyCenterX - e.size * 0.15} 
-                  y={enemyCenterY - e.size * 0.4} 
-                  width={e.size * 0.3} 
-                  height={e.size * 0.8} 
-                  color="rgba(248,250,252,0.4)" 
-                />
-                <Rect 
-                  x={enemyCenterX - e.size * 0.4} 
-                  y={enemyCenterY - e.size * 0.15} 
-                  width={e.size * 0.8} 
-                  height={e.size * 0.3} 
-                  color="rgba(248,250,252,0.4)" 
-                />
-              </>
-            )}
-            
-            {/* Center core */}
-            <Circle cx={enemyCenterX} cy={enemyCenterY} r={e.size * 0.15} color="rgba(248,250,252,0.6)" />
-            <Circle cx={enemyCenterX} cy={enemyCenterY} r={e.size * 0.08} color="rgba(15,23,42,0.8)" />
-            
-            {/* Corner accents */}
-            <Circle cx={e.x + ox + e.size * 0.2} cy={e.y + oy + e.size * 0.2} r={1.5} color="rgba(248,250,252,0.5)" />
-            <Circle cx={e.x + ox + e.size * 0.8} cy={e.y + oy + e.size * 0.2} r={1.5} color="rgba(248,250,252,0.5)" />
-            <Circle cx={e.x + ox + e.size * 0.2} cy={e.y + oy + e.size * 0.8} r={1.5} color="rgba(248,250,252,0.5)" />
-            <Circle cx={e.x + ox + e.size * 0.8} cy={e.y + oy + e.size * 0.8} r={1.5} color="rgba(248,250,252,0.5)" />
-          </Group>
-          );
-        })}
-
-        {boss && boss.alive && (() => {
-          const bossCenterX = boss.x + boss.width / 2 + ox;
-          const bossCenterY = boss.y + boss.height / 2 + oy;
-          const hpRatio = boss.hp / boss.maxHp;
-          const bossGlowColor = hpRatio > 0.5 ? 'rgba(168,85,247,0.4)' : hpRatio > 0.25 ? 'rgba(249,115,22,0.4)' : 'rgba(239,68,68,0.5)';
-          
-          return (
-          <Group>
-            {/* Outer energy field */}
-            <Circle cx={bossCenterX} cy={bossCenterY} r={boss.width / 2 + 20} color="rgba(147,51,234,0.2)" />
-            <Circle cx={bossCenterX} cy={bossCenterY} r={boss.width / 2 + 14} color={bossGlowColor} />
-            
-            {/* Boss body with pattern */}
-            <Rect x={boss.x + ox} y={boss.y + oy} width={boss.width} height={boss.height} color="#a855f7" />
-            
-            {/* Inner details */}
-            <Rect 
-              x={bossCenterX - boss.width * 0.3} 
-              y={bossCenterY - boss.height * 0.15} 
-              width={boss.width * 0.6} 
-              height={boss.height * 0.3} 
-              color="rgba(248,250,252,0.3)" 
-            />
-            <Circle cx={bossCenterX} cy={bossCenterY} r={boss.width * 0.2} color="rgba(248,250,252,0.5)" />
-            <Circle cx={bossCenterX} cy={bossCenterY} r={boss.width * 0.12} color="rgba(15,23,42,0.8)" />
-            
-            {/* Corner details */}
-            <Circle cx={boss.x + ox + boss.width * 0.15} cy={boss.y + oy + boss.height * 0.15} r={2} color="rgba(248,250,252,0.6)" />
-            <Circle cx={boss.x + ox + boss.width * 0.85} cy={boss.y + oy + boss.height * 0.15} r={2} color="rgba(248,250,252,0.6)" />
-            <Circle cx={boss.x + ox + boss.width * 0.15} cy={boss.y + oy + boss.height * 0.85} r={2} color="rgba(248,250,252,0.6)" />
-            <Circle cx={boss.x + ox + boss.width * 0.85} cy={boss.y + oy + boss.height * 0.85} r={2} color="rgba(248,250,252,0.6)" />
-            
-            <BossHealthBar
-              health={boss.hp}
-              maxHealth={boss.maxHp}
-              x={width / 2 - 100 + ox}
-              y={40 + oy}
-              width={200}
-              height={16}
-            />
-          </Group>
-          );
-        })()}
-
-        {explosions.map((ex, i) => {
-          if (!ex || ex.life <= 0) return null;
-          const progress = 1 - (ex.life / ex.maxLife);
-          const alpha = 0.85 * (1 - progress);
-          return (
-            <Circle
-              key={`ex-${i}`}
-              cx={ex.x + ox}
-              cy={ex.y + oy}
-              r={ex.radius}
-              color={`rgba(248,250,252,${alpha})`}
-            />
-          );
-        })}
-
-        {particles.map((p, i) => (
-          <Circle key={`p-${i}`} cx={p.x + ox} cy={p.y + oy} r={p.radius} color={p.color || "rgba(248,250,252,0.8)"} />
-        ))}
-
-        {powerups.map((p, i) => {
-          const px = p.x + p.size / 2 + ox;
-          const py = p.y + p.size / 2 + oy;
-          return (
-            <Group key={`pw-${i}`}>
-          <Circle
-                cx={px}
-                cy={py}
-                r={p.size / 2 + 2}
-                color="rgba(30,41,59,0.5)"
-              />
-              <Circle
-                cx={px}
-                cy={py}
-            r={p.size / 2}
-                color={p.kind === 'shield' ? '#a855f7' : p.kind === 'slow' ? '#f97316' : getPowerupColor(p.kind)}
-              />
-            </Group>
-          );
-        })}
+        <MuzzleFlashes flashes={muzzleFlashes} ox={ox} oy={oy} />
+        <PlayerBullets bullets={bullets} ox={ox} oy={oy} />
+        <EnemyBullets bullets={enemyBullets} ox={ox} oy={oy} />
+        <Enemies enemies={enemies} ox={ox} oy={oy} />
+        <BossShip boss={boss} ox={ox} oy={oy} screenWidth={width} />
+        <Explosions explosions={explosions} ox={ox} oy={oy} />
+        <Particles particles={particles} ox={ox} oy={oy} />
+        <Powerups powerups={powerups} ox={ox} oy={oy} />
       </Canvas>
 
-      {playerHitFlash > 0 && (
-        <View style={[styles.hitFlash, { opacity: playerHitFlash }]} pointerEvents="none" />
-      )}
+      <HitFlash intensity={playerHitFlash} />
+      <LevelBanner text={levelBanner} visible={!inBonusRound} />
+      <BonusBanner visible={inBonusRound} timeLeft={bonusTimeLeft} />
 
-      {levelBanner && !inBonusRound && (
-        <View style={styles.levelBanner}>
-          <Text style={styles.levelBannerText}>{levelBanner}</Text>
-        </View>
-      )}
+      <GameHUD
+        score={score}
+        currentStage={currentStage}
+        level={level}
+        levelKills={levelKills}
+        levelTarget={levelTarget}
+        lives={player.lives}
+        hasShield={player.shield}
+        isPaused={isPaused}
+        hudScale={hudScale}
+        onPauseToggle={handlePauseToggle}
+        onExit={handleExitToMenu}
+      />
 
-      {inBonusRound && (
-        <View style={styles.bonusBanner}>
-          <Text style={styles.bonusTitle}>BONUS SHOOT-OUT</Text>
-          <Text style={styles.bonusTimer}>{bonusTimeLeft.toFixed(1)}s</Text>
-        </View>
-      )}
+      <FireButton
+        position={fireButtonPosition}
+        disabled={fireButtonDisabled}
+        autoFire={autoFire}
+        onFire={fireWeapon}
+        visible={player.alive && !gameOver}
+      />
 
-      <View style={[styles.hud, { transform: [{ scale: hudScale }] }]}>
-        <View style={styles.hudColumn}>
-          <Text style={styles.scoreLabel}>SCORE</Text>
-          <Text style={styles.scoreValue}>{formattedScore}</Text>
-        </View>
-        <View style={styles.hudColumn}>
-          <Text style={styles.hudText}>Level</Text>
-          <Text style={styles.levelText}>{String(level).padStart(2, '0')}</Text>
-          <Text style={styles.levelProgress}>
-            {Math.min(levelKills, levelTarget)}/{levelTarget}
-          </Text>
-        </View>
-        <View style={styles.hudColumn}>
-          <Text style={styles.hudText}>Lives</Text>
-          <Text style={styles.livesText}>{livesDisplay}</Text>
-          <Text style={[styles.hudText, player.shield ? styles.shieldTextOn : styles.shieldTextOff]}>
-            Shield {shieldStatus}
-          </Text>
-        </View>
-        <TouchableOpacity onPress={handlePauseToggle}>
-          <Text style={styles.hudText}>{isPaused ? 'Resume' : 'Pause'}</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.backBtnContainer}>
-        <TouchableOpacity onPress={handleExitToMenu}>
-          <Text style={styles.backBtn}>Exit</Text>
-        </TouchableOpacity>
-      </View>
-
-      {player.alive && !gameOver && (
-        <View style={[
-          styles.fireButtonContainer,
-          fireButtonPosition === 'left' ? styles.fireButtonContainerLeft : styles.fireButtonContainerRight
-        ]}>
-          <TouchableOpacity
-            style={[styles.fireButton, fireButtonDisabled && styles.fireButtonDisabled]}
-            onPress={fireWeapon}
-            disabled={fireButtonDisabled}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.fireButtonText}>FIRE</Text>
-          </TouchableOpacity>
-          <View style={[styles.autoFireChip, autoFire && styles.autoFireChipActive]}>
-            <Text style={styles.autoFireChipText}>{autoBadgeText}</Text>
-          </View>
-        </View>
-      )}
-
-      {scoreTexts.map((st) => {
-        const alpha = Math.max(0, Math.min(1, st.life));
-        let fontSize = st.isBoss ? 28 : st.isCombo ? 32 : 20;
-        if (st.isCombo) {
-          fontSize = 28 + Math.min(st.life * 8, 12); // Scale up combo text
-        }
-        return (
-          <View
-            key={`score-${st.id}`}
-            style={[
-              styles.scoreText,
-              {
-                left: st.x + ox - (st.isCombo ? 60 : 30),
-                top: st.y + oy - 20,
-                opacity: alpha,
-                transform: [{ scale: st.isCombo ? 1 + (1 - st.life) * 0.3 : 1 }]
-              }
-            ]}
-            pointerEvents="none"
-          >
-            <Text
-              style={[
-                styles.scoreTextContent,
-                {
-                  fontSize,
-                  color: st.color || (st.isBoss ? '#fbbf24' : '#22c55e'),
-                  fontWeight: st.isCombo ? '900' : '800',
-                  textShadowColor: st.isCombo ? 'rgba(0,0,0,0.9)' : 'rgba(0,0,0,0.75)',
-                  textShadowOffset: st.isCombo ? { width: 2, height: 2 } : { width: 1, height: 1 },
-                  textShadowRadius: st.isCombo ? 5 : 3,
-                  letterSpacing: st.isCombo ? 2 : 0
-                }
-              ]}
-            >
-              {st.text}
-            </Text>
-          </View>
-        );
-      })}
+      <ScorePopup items={scoreTexts} offsetX={ox} offsetY={oy} />
 
       <PauseOverlay
         visible={isPaused && !gameOver && !showGuide}
@@ -1612,10 +1157,24 @@ useEffect(() => {
         onChangeMusicVolume={handleChangeMusicVolume}
       />
 
-      <ControlHintsOverlay visible={showGuide && !gameOver} onDismiss={handleGuideDismiss} />
+      <ControlHintsOverlay 
+        visible={showGuide && !gameOver} 
+        onDismiss={handleGuideDismiss}
+        onBack={showTutorial ? onExit : null}
+      />
+
+      <StageCompleteOverlay 
+        visible={stageComplete && !gameOver} 
+        currentStage={currentStage} 
+        allStages={STAGES} 
+      />
 
       {gameOver && (
         <GameOverOverlay score={score} onRetry={resetGame} onExit={onExit} />
+      )}
+      
+      {achievementToast && (
+        <AchievementToast achievement={achievementToast} />
       )}
     </View>
   );
@@ -1623,175 +1182,5 @@ useEffect(() => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'black' },
-  canvas: { flex: 1 },
-  hud: {
-    position: 'absolute',
-    top: 40,
-    left: 16,
-    right: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center'
-  },
-  hudText: {
-    color: '#e5e7eb',
-    fontSize: 16,
-    fontWeight: '600'
-  },
-  hudColumn: {
-    alignItems: 'center'
-  },
-  scoreLabel: {
-    color: '#38bdf8',
-    fontSize: 12,
-    letterSpacing: 2
-  },
-  scoreValue: {
-    color: '#f8fafc',
-    fontSize: 26,
-    fontWeight: '800',
-    letterSpacing: 1
-  },
-  livesText: {
-    color: '#f87171',
-    fontSize: 18,
-    marginVertical: 4
-  },
-  shieldTextOn: {
-    color: '#22c55e'
-  },
-  shieldTextOff: {
-    color: '#94a3b8'
-  },
-  backBtnContainer: {
-    position: 'absolute',
-    bottom: 30,
-    left: 16
-  },
-  backBtn: {
-    color: '#9ca3af',
-    fontSize: 14,
-    textDecorationLine: 'underline'
-  },
-  fireButtonContainer: {
-    position: 'absolute',
-    bottom: 30,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  fireButtonContainerLeft: {
-    left: 16
-  },
-  fireButtonContainerRight: {
-    right: 16
-  },
-  fireButton: {
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    backgroundColor: '#22c55e',
-    borderRadius: 999,
-    minWidth: 100,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#22c55e',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5
-  },
-  fireButtonDisabled: {
-    backgroundColor: '#64748b',
-    opacity: 0.5,
-    shadowOpacity: 0
-  },
-  fireButtonText: {
-    color: '#020617',
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: 2
-  },
-  autoFireChip: {
-    marginTop: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(15,23,42,0.75)'
-  },
-  autoFireChipActive: {
-    backgroundColor: 'rgba(34,197,94,0.85)'
-  },
-  autoFireChipText: {
-    color: '#e2e8f0',
-    fontSize: 12,
-    letterSpacing: 1,
-    fontWeight: '600'
-  },
-  hitFlash: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(248,113,113,0.25)'
-  },
-  scoreText: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-    pointerEvents: 'none'
-  },
-  scoreTextContent: {
-    fontWeight: '800',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3
-  },
-  levelText: {
-    color: '#fbbf24',
-    fontSize: 22,
-    fontWeight: '800'
-  },
-  levelProgress: {
-    color: '#cbd5f5',
-    fontSize: 12
-  },
-  levelBanner: {
-    position: 'absolute',
-    top: '30%',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  levelBannerText: {
-    color: '#f8fafc',
-    fontSize: 36,
-    fontWeight: '900',
-    letterSpacing: 4,
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 0, height: 4 },
-    textShadowRadius: 8
-  },
-  bonusBanner: {
-    position: 'absolute',
-    top: '30%',
-    left: 0,
-    right: 0,
-    alignItems: 'center'
-  },
-  bonusTitle: {
-    color: '#fb923c',
-    fontSize: 32,
-    fontWeight: '900',
-    letterSpacing: 4,
-    textShadowColor: 'rgba(0,0,0,0.9)',
-    textShadowOffset: { width: 0, height: 4 },
-    textShadowRadius: 8
-  },
-  bonusTimer: {
-    color: '#f8fafc',
-    fontSize: 20,
-    fontWeight: '700',
-    marginTop: 4
-  }
+  canvas: { flex: 1 }
 });

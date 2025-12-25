@@ -1,3 +1,34 @@
+/**
+ * swoops.js - Enemy Swoop Attack Patterns
+ * 
+ * Manages enemy dive attacks where enemies leave formation
+ * and follow curved paths toward the player before returning.
+ * 
+ * @module swoops
+ */
+
+/**
+ * @typedef {'straight'|'arc-left'|'arc-right'|'corkscrew'} SwoopPattern
+ */
+
+/**
+ * @typedef {Object} SwoopState
+ * @property {boolean} active - Whether swoop is in progress
+ * @property {SwoopPattern|null} pattern - Current swoop pattern
+ * @property {number} time - Elapsed time in seconds
+ * @property {number} duration - Total swoop duration
+ * @property {number} startX - Starting X position
+ * @property {number} startY - Starting Y position
+ * @property {number} targetX - Target X (usually bottom of screen)
+ * @property {number} targetY - Target Y
+ * @property {number} returnX - Formation X to return to
+ * @property {number} returnY - Formation Y to return to
+ */
+
+/**
+ * Create a new swoop state object
+ * @returns {SwoopState} Initial swoop state
+ */
 export function createSwoopState() {
   return {
     active: false,
@@ -13,6 +44,16 @@ export function createSwoopState() {
   };
 }
 
+/**
+ * Start a swoop attack for an enemy
+ * @param {Object} enemy - Enemy starting the swoop
+ * @param {SwoopPattern} patternType - Type of swoop pattern
+ * @param {number} [targetX] - Target X (defaults to center)
+ * @param {number} [targetY] - Target Y (defaults to below screen)
+ * @param {number} screenWidth - Screen width for calculations
+ * @param {number} screenHeight - Screen height for calculations
+ * @returns {SwoopState} Configured swoop state
+ */
 export function startSwoop(enemy, patternType, targetX, targetY, screenWidth, screenHeight) {
   const swoop = createSwoopState();
   swoop.active = true;
@@ -43,6 +84,15 @@ export function startSwoop(enemy, patternType, targetX, targetY, screenWidth, sc
   return swoop;
 }
 
+/**
+ * Update swoop position based on pattern and elapsed time
+ * @param {Object} enemy - Enemy being updated
+ * @param {SwoopState} swoopState - Current swoop state
+ * @param {number} dt - Delta time in seconds
+ * @param {number} screenWidth - Screen width
+ * @param {number} screenHeight - Screen height
+ * @returns {Object} Updated enemy with new position and behavior
+ */
 export function updateSwoop(enemy, swoopState, dt, screenWidth, screenHeight) {
   if (!swoopState || !swoopState.active) {
     return { ...enemy, behavior: enemy.behavior || 'idle' };

@@ -1,6 +1,25 @@
+/**
+ * boss-patterns.js - Boss attack pattern generation
+ * Handles bullet patterns: radial, spread, burst, spiral, aimed
+ */
+
 import bossConfig from '../config/boss.json';
 import { BULLET_WIDTH, BULLET_HEIGHT } from '../entities/types';
 
+/**
+ * @typedef {Object} BossPatternState
+ * @property {string} stageKey - Current stage key
+ * @property {Object} config - Boss configuration from boss.json
+ * @property {string[]} patternQueue - Queued patterns
+ * @property {string|null} currentPattern - Active pattern
+ * @property {number} patternTime - Time in current pattern
+ */
+
+/**
+ * Create boss pattern state for a stage
+ * @param {string} stageKey - Stage key ('stage1', 'stage2', 'stage3')
+ * @returns {BossPatternState|null}
+ */
 export function createBossPatterns(stageKey) {
   const cfg = bossConfig[stageKey];
   if (!cfg) return null;
@@ -14,6 +33,12 @@ export function createBossPatterns(stageKey) {
   };
 }
 
+/**
+ * Get boss's current attack pattern based on HP phase
+ * @param {BossPatternState} state - Pattern state object
+ * @param {Object} boss - Boss entity
+ * @returns {'radial'|'spread'|'burst'|'spiral'|'aimed'}
+ */
 export function getBossPattern(state, boss) {
   if (!state || !boss) return 'radial';
   
@@ -29,6 +54,14 @@ export function getBossPattern(state, boss) {
   return phases[phases.length - 1]?.pattern || 'radial';
 }
 
+/**
+ * Create a single boss bullet with velocity components
+ * @param {number} cx - Center X position
+ * @param {number} cy - Center Y position
+ * @param {number} angle - Fire angle in radians
+ * @param {number} speed - Bullet speed
+ * @returns {Object} Bullet entity
+ */
 export function createBossBullet(cx, cy, angle, speed) {
   const vx = Math.sin(angle) * speed;
   const vy = Math.cos(angle) * speed;
@@ -43,6 +76,22 @@ export function createBossBullet(cx, cy, angle, speed) {
   };
 }
 
+/**
+ * Generate bullets for a boss attack pattern
+ * @param {Object} boss - Boss entity with x, y, width, height
+ * @param {'radial'|'spread'|'burst'|'spiral'|'aimed'} pattern - Attack pattern
+ * @param {string} stageKey - Current stage key
+ * @param {number} playerX - Player X position (for aimed attacks)
+ * @param {number} playerY - Player Y position (for aimed attacks)
+ * @returns {Object[]} Array of bullet entities
+ * 
+ * Pattern descriptions:
+ * - radial: 12 bullets in a circle
+ * - spread: 7 bullets in a forward arc
+ * - burst: 8 bullets aimed at player spread
+ * - spiral: 6 rotating bullets
+ * - aimed: Single fast bullet at player
+ */
 export function generateBossBullets(boss, pattern, stageKey, playerX, playerY) {
   const cfg = bossConfig[stageKey];
   if (!cfg) return [];

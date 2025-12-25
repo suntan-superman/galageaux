@@ -4,11 +4,18 @@ import { Canvas, Rect, Circle } from '@shopify/react-native-skia';
 import * as AudioManager from '../engine/audio';
 import GameScreen from './GameScreen';
 import AuthScreen from './AuthScreen';
+import AchievementsScreen from './AchievementsScreen';
+import SettingsScreen from './SettingsScreen';
+import StatsScreen from './StatsScreen';
+import AudioStatusBadge from '../components/AudioStatusBadge';
 
 export default function MainMenu() {
   const { width, height } = useWindowDimensions();
   const [inGame, setInGame] = useState(false);
   const [authVisible, setAuthVisible] = useState(false);
+  const [achievementsVisible, setAchievementsVisible] = useState(false);
+  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [statsVisible, setStatsVisible] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
 
   // Initialize audio and play menu music
@@ -46,8 +53,26 @@ export default function MainMenu() {
     setAuthVisible(true);
   };
 
+  const handleAchievementsClick = () => {
+    AudioManager.playSound('uiClick', 0.6);
+    setAchievementsVisible(true);
+  };
+
+  const handleSettingsClick = () => {
+    AudioManager.playSound('uiClick', 0.6);
+    setSettingsVisible(true);
+  };
+
+  const handleStatsClick = () => {
+    AudioManager.playSound('uiClick', 0.6);
+    setStatsVisible(true);
+  };
+
   if (inGame) return <GameScreen onExit={() => setInGame(false)} showTutorial={showTutorial} />;
   if (authVisible) return <AuthScreen onClose={() => setAuthVisible(false)} />;
+  if (achievementsVisible) return <AchievementsScreen onBack={() => setAchievementsVisible(false)} />;
+  if (settingsVisible) return <SettingsScreen onBack={() => setSettingsVisible(false)} />;
+  if (statsVisible) return <StatsScreen onBack={() => setStatsVisible(false)} />;
 
   return (
     <View style={styles.container}>
@@ -64,6 +89,7 @@ export default function MainMenu() {
         ))}
       </Canvas>
       <View style={styles.overlay}>
+        <AudioStatusBadge style={styles.audioStatus} />
         <View style={styles.centerSection}>
           <Text style={styles.title}>GALAGEAUX</Text>
           <Text style={styles.subtitle}>Vertical neon space shooter</Text>
@@ -74,6 +100,15 @@ export default function MainMenu() {
         <View style={styles.bottomSection}>
           <TouchableOpacity style={[styles.button, styles.tutorialButton]} onPress={handleTutorialClick}>
             <Text style={[styles.buttonText, styles.tutorialButtonText]}>SHOW ME HOW</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.button, styles.achievementsButton]} onPress={handleAchievementsClick}>
+            <Text style={[styles.buttonText, styles.achievementsButtonText]}>🏆 ACHIEVEMENTS</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.button, styles.settingsButton]} onPress={handleSettingsClick}>
+            <Text style={[styles.buttonText, styles.settingsButtonText]}>⚙️ SETTINGS</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.button, styles.statsButton]} onPress={handleStatsClick}>
+            <Text style={[styles.buttonText, styles.statsButtonText]}>📊 STATS</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={handleAccountClick}>
             <Text style={[styles.buttonText, styles.secondaryButtonText]}>ACCOUNT</Text>
@@ -93,6 +128,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 40
+  },
+  audioStatus: {
+    position: 'absolute',
+    top: 50,
+    right: 16,
+    zIndex: 10
   },
   centerSection: {
     alignItems: 'center',
@@ -118,7 +159,7 @@ const styles = StyleSheet.create({
     marginBottom: 32
   },
   button: {
-    width: 200,
+    width: 260,
     paddingHorizontal: 40,
     paddingVertical: 14,
     backgroundColor: '#22c55e',
@@ -140,6 +181,30 @@ const styles = StyleSheet.create({
   },
   tutorialButtonText: {
     color: '#38bdf8'
+  },
+  achievementsButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#fbbf24'
+  },
+  achievementsButtonText: {
+    color: '#fbbf24'
+  },
+  settingsButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#a855f7'
+  },
+  settingsButtonText: {
+    color: '#a855f7'
+  },
+  statsButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#06b6d4'
+  },
+  statsButtonText: {
+    color: '#06b6d4'
   },
   secondaryButton: {
     backgroundColor: 'transparent',

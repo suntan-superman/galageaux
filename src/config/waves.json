@@ -10,6 +10,88 @@
       "zigzag",
       "dive",
       "formation_v"
-    ]
+    ],
+    "enemyTypes": ["grunt", "shooter", "dive"]
+  },
+  "stage2": {
+    "name": "Nebula Assault",
+    "spawnInterval": 1.0,
+    "maxEnemies": 50,
+    "enemySpeed": 150,
+    "enemyBulletSpeed": 250,
+    "patterns": [
+      "line",
+      "zigzag",
+      "dive",
+      "formation_v",
+      "circle"
+    ],
+    "enemyTypes": ["grunt", "shooter", "scout", "elite"]
+  },
+  "stage3": {
+    "name": "Asteroid Field",
+    "spawnInterval": 0.9,
+    "maxEnemies": 60,
+    "enemySpeed": 170,
+    "enemyBulletSpeed": 270,
+    "patterns": [
+      "line",
+      "zigzag",
+      "dive",
+      "formation_v",
+      "circle"
+    ],
+    "enemyTypes": ["shooter", "dive", "scout", "tank", "kamikaze"]
+  },
+  "stage4": {
+    "name": "Dark Sector",
+    "spawnInterval": 0.8,
+    "maxEnemies": 70,
+    "enemySpeed": 190,
+    "enemyBulletSpeed": 290,
+    "patterns": [
+      "line",
+      "zigzag",
+      "dive",
+      "formation_v",
+      "circle",
+      "spiral"
+    ],
+    "enemyTypes": ["shooter", "elite", "tank", "kamikaze", "swarm"],
+    "specialEffects": ["fog", "limited_visibility"]
+  },
+  "stage5": {
+    "name": "Quantum Storm",
+    "spawnInterval": 0.7,
+    "maxEnemies": 80,
+    "enemySpeed": 210,
+    "enemyBulletSpeed": 310,
+    "patterns": [
+      "zigzag",
+      "dive",
+      "formation_v",
+      "circle",
+      "spiral",
+      "pincer"
+    ],
+    "enemyTypes": ["elite", "tank", "kamikaze", "swarm", "teleporter"],
+    "specialEffects": ["gravity_wells", "warp_zones"]
+  },
+  "stage6": {
+    "name": "Final Frontier",
+    "spawnInterval": 0.6,
+    "maxEnemies": 100,
+    "enemySpeed": 230,
+    "enemyBulletSpeed": 330,
+    "patterns": [
+      "formation_v",
+      "circle",
+      "spiral",
+      "pincer",
+      "swarm_rush"
+    ],
+    "enemyTypes": ["elite", "tank", "kamikaze", "swarm", "teleporter", "mothership"],
+    "specialEffects": ["boss_arena", "hazard_zones"],
+    "finalBoss": true
   }
 }

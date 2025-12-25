@@ -9,11 +9,9 @@ export default {
 
     icon: "./assets/icons/notext_ios_1024.png",
 
-//  splash: {
-//      image: "./assets/splash.png",        // optional – you can replace with your own
-//      resizeMode: "contain",
-//      backgroundColor: "#020617"
-//  },
+    plugins: [
+      "expo-secure-store"
+    ],
 
     ios: {
       bundleIdentifier: "com.sjroy5.galageaux",

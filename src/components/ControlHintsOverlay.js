@@ -1,11 +1,20 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 
-export default function ControlHintsOverlay({ visible, onDismiss }) {
+export default function ControlHintsOverlay({ visible, onDismiss, onBack }) {
   if (!visible) return null;
 
   return (
     <View style={styles.overlay} pointerEvents="auto">
+      {onBack && (
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={onBack}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Text style={styles.backButtonText}>← Back</Text>
+        </TouchableOpacity>
+      )}
       <View style={styles.card}>
         <Text style={styles.title}>🚀 How to Play</Text>
         <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -83,6 +92,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
     zIndex: 12
+  },
+  backButton: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    zIndex: 15,
+  },
+  backButtonText: {
+    color: '#38bdf8',
+    fontSize: 16,
+    fontWeight: '600',
   },
   card: {
     width: '100%',

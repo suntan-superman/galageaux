@@ -18,5 +18,49 @@
         "pattern": "burst"
       }
     ]
+  },
+  "stage2": {
+    "hp": 150,
+    "enterY": 100,
+    "speed": 50,
+    "bulletSpeed": 280,
+    "phases": [
+      {
+        "hpThreshold": 100,
+        "pattern": "spiral"
+      },
+      {
+        "hpThreshold": 60,
+        "pattern": "aimed"
+      },
+      {
+        "hpThreshold": 0,
+        "pattern": "burst"
+      }
+    ]
+  },
+  "stage3": {
+    "hp": 200,
+    "enterY": 100,
+    "speed": 60,
+    "bulletSpeed": 300,
+    "phases": [
+      {
+        "hpThreshold": 140,
+        "pattern": "radial"
+      },
+      {
+        "hpThreshold": 80,
+        "pattern": "spiral"
+      },
+      {
+        "hpThreshold": 40,
+        "pattern": "aimed"
+      },
+      {
+        "hpThreshold": 0,
+        "pattern": "burst"
+      }
+    ]
   }
 }

@@ -11,6 +11,7 @@ dist/
 web-build/
 expo-env.d.ts
 
+docs/firebase.md
 # Native
 android/
 ios/

@@ -1,3 +1,21 @@
+/**
+ * formations.js - Enemy formation layouts and positioning
+ * Handles grid, V-shape, and wave formation patterns
+ */
+
+/**
+ * @typedef {Object} FormationOffset
+ * @property {number} dx - X offset from formation center
+ * @property {number} dy - Y offset from formation center
+ */
+
+/**
+ * Get position offsets for a formation type
+ * @param {'v'|'line'|'staggered'} type - Formation type
+ * @param {number} count - Number of enemies in formation
+ * @param {number} [spacing=36] - Spacing between enemies
+ * @returns {FormationOffset[]}
+ */
 export function getFormationOffsets(type, count, spacing = 36) {
   const offsets = [];
   if (type === 'v') {
@@ -21,6 +39,29 @@ export function getFormationOffsets(type, count, spacing = 36) {
   return offsets;
 }
 
+/**
+ * @typedef {Object} Formation
+ * @property {string} type - Formation type ('grid', 'v', 'wave')
+ * @property {Object[]} enemies - Array of enemy position data
+ * @property {number} baseX - Formation center X
+ * @property {number} baseY - Formation top Y
+ * @property {number} spacing - Spacing between units
+ * @property {string} behavior - Current behavior state
+ */
+
+/**
+ * Create a full formation object with enemy positions
+ * @param {'grid'|'v'|'wave'} type - Formation type
+ * @param {Object} [options] - Configuration options
+ * @param {number} [options.width=400] - Screen width
+ * @param {number} [options.height=800] - Screen height
+ * @param {number} [options.spacing=36] - Unit spacing
+ * @param {number} [options.rows] - Grid rows (for grid type)
+ * @param {number} [options.cols] - Grid columns (for grid type)
+ * @param {number} [options.size] - Formation size (for v type)
+ * @param {number} [options.count] - Enemy count (for wave type)
+ * @returns {Formation}
+ */
 export function createFormation(type, options = {}) {
   const { width = 400, height = 800, spacing = 36 } = options;
   

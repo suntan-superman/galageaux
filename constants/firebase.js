@@ -1,22 +1,22 @@
-// Firebase configuration for mi Factotum
-// Environment variables should be set in your app.config.js or environment
+// Firebase configuration for Galageaux
+// Environment variables loaded from .env file (prefixed with EXPO_PUBLIC_)
 
 import { initializeApp } from 'firebase/app';
-import { initializeAuth, getReactNativePersistence, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
-import { getStorage, connectStorageEmulator } from 'firebase/storage';
-import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
+import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
+import { getFunctions } from 'firebase/functions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Firebase configuration
+// Firebase configuration from environment variables
 const firebaseConfig = {
-  apiKey: "AIzaSyAEHhLccanbJalSN0Zbdnvq_CwSSbpllrg",
-  authDomain: "mi-factotum-field-service.firebaseapp.com",
-  projectId: "mi-factotum-field-service",
-  storageBucket: "mi-factotum-field-service.firebasestorage.app",
-  messagingSenderId: "1030013411579",
-  appId: "1:1030013411579:web:37cdb1ce1e57c1e75c505e",
-  measurementId: "G-VS61WKSG39"
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase
@@ -41,26 +41,5 @@ export { auth };
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
-
-// Connect to emulators in development (disabled for now)
-// if (__DEV__) {
-//   try {
-//     // Only connect if not already connected
-//     if (!auth.config.emulator) {
-//       connectAuthEmulator(auth, 'http://localhost:9099');
-//     }
-//     if (!db._delegate._databaseId.projectId.includes('demo-')) {
-//       connectFirestoreEmulator(db, 'localhost', 8080);
-//     }
-//     if (!storage._delegate._host.includes('localhost')) {
-//       connectStorageEmulator(storage, 'localhost', 9199);
-//     }
-//     if (!functions._delegate._url.includes('localhost')) {
-//       connectFunctionsEmulator(functions, 'localhost', 5001);
-//     }
-//   } catch (error) {
-//     console.log('Emulator connection failed (likely already connected):', error);
-//   }
-// }
 
 export default app;
