@@ -17,6 +17,7 @@ import Slider from '@react-native-community/slider';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as AudioManager from '../engine/audio';
 import { STORAGE_KEYS } from '../constants/game';
+import { APP_INFO, getCopyrightText } from '../../constants/appInfo';
 
 export default function SettingsScreen({ onBack }) {
   // Audio settings
@@ -293,8 +294,8 @@ export default function SettingsScreen({ onBack }) {
 
         {/* Version Info */}
         <View style={styles.versionSection}>
-          <Text style={styles.versionText}>Galageaux v1.0.0</Text>
-          <Text style={styles.copyrightText}>© 2025 Galageaux</Text>
+          <Text style={styles.versionText}>{APP_INFO.name} v{APP_INFO.version}</Text>
+          <Text style={styles.copyrightText}>{getCopyrightText('symbol-first')}</Text>
         </View>
 
         <View style={styles.bottomSpacer} />

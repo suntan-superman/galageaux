@@ -15,6 +15,7 @@ import {
 import LiquidGlassBackground from '../components/LiquidGlassBackground';
 import LiquidGlassCard from '../components/LiquidGlassCard';
 import LiquidGlassButton from '../components/LiquidGlassButton';
+import { getCopyrightText } from '../../constants/appInfo';
 
 const MODES = [
   { key: 'login', label: 'Login' },
@@ -252,7 +253,7 @@ export default function AuthScreen({ onClose }) {
               </Text>
             </Text>
             <Text style={styles.copyrightText}>
-              Galageaux © 2025
+              {getCopyrightText('name-first')}
             </Text>
           </View>
         </View>

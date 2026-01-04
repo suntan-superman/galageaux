@@ -18,6 +18,7 @@ import { COLORS } from '../constants/colors';
 import { AuthContext } from '../contexts/AuthContext';
 import { FONT_SIZES, SPACING, BUTTON_SIZES, BORDER_RADIUS, ICON_SIZES, CARD_SIZES, WIDTHS, HEIGHTS, hp, wp, rf } from '../constants/responsiveSizes';
 import LiquidGlassButton from '../components/LiquidGlassButton';
+import { getCopyrightText } from '../constants/appInfo';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -252,7 +253,7 @@ const LoginScreen = ({ navigation }) => {
           By signing in, you agree to our Terms of Service and Privacy Policy
         </Text>
         <Text style={styles.copyrightText}>
-          Workside Software LLC Copyright 2025
+          {getCopyrightText('sample')}
         </Text>
       </View>
     </View>
