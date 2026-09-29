@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants/game';
 import * as AudioManager from '../engine/audio';
 import GameScreen from './GameScreen';
+import ShowMeDemo from './ShowMeDemo';
 import AuthScreen from './AuthScreen';
 import AchievementsScreen from './AchievementsScreen';
 import SettingsScreen from './SettingsScreen';
@@ -33,14 +34,14 @@ function MenuButton({ label, icon, width, onPress, style, textStyle }) {
 export default function MainMenu() {
   const { width, height } = useWindowDimensions();
   const [inGame, setInGame] = useState(false);
+  const [showDemo, setShowDemo] = useState(false);
   const [authVisible, setAuthVisible] = useState(false);
   const [achievementsVisible, setAchievementsVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [statsVisible, setStatsVisible] = useState(false);
-  const [showTutorial, setShowTutorial] = useState(false);
   const preferencesRestored = useRef(false);
   const audioInitialization = useRef(null);
-  const menuVisible = !inGame && !authVisible && !achievementsVisible && !settingsVisible && !statsVisible;
+  const menuVisible = !inGame && !showDemo && !authVisible && !achievementsVisible && !settingsVisible && !statsVisible;
   const buttonWidth = Math.min(320, Math.max(0, width - 48));
 
   // Restore preferences before cold-menu playback; never save scaled track gain.
@@ -83,14 +84,12 @@ export default function MainMenu() {
 
   const handlePlayClick = () => {
     AudioManager.playSound('uiClick', 0.6);
-    setShowTutorial(false);
     setInGame(true);
   };
 
   const handleTutorialClick = () => {
     AudioManager.playSound('uiClick', 0.6);
-    setShowTutorial(true);
-    setInGame(true);
+    setShowDemo(true);
   };
 
   const handleAccountClick = () => {
@@ -113,7 +112,8 @@ export default function MainMenu() {
     setStatsVisible(true);
   };
 
-  if (inGame) return <GameScreen onExit={() => setInGame(false)} showTutorial={showTutorial} />;
+  if (inGame) return <GameScreen onExit={() => setInGame(false)} />;
+  if (showDemo) return <ShowMeDemo onBack={() => setShowDemo(false)} onPlay={() => { setShowDemo(false); setInGame(true); }} />;
   if (authVisible) return <AuthScreen onClose={() => setAuthVisible(false)} />;
   if (achievementsVisible) return <AchievementsScreen onBack={() => setAchievementsVisible(false)} />;
   if (settingsVisible) return <SettingsScreen onBack={() => setSettingsVisible(false)} />;

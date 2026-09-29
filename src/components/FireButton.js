@@ -10,7 +10,9 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
  * @property {'left'|'right'} position - Button position on screen
  * @property {boolean} disabled - Whether button is disabled
  * @property {boolean} autoFire - Whether auto-fire is enabled
- * @property {function} onFire - Fire callback
+ * @property {function} onFire - Tap callback, also used by accessibility activation
+ * @property {function} [onPressIn] - Start firing immediately and begin a hold
+ * @property {function} [onPressOut] - End a held press
  * @property {boolean} visible - Whether button should be visible
  */
 
@@ -23,6 +25,8 @@ export default function FireButton({
   disabled = false,
   autoFire = false,
   onFire,
+  onPressIn,
+  onPressOut,
   visible = true
 }) {
   if (!visible) return null;
@@ -34,11 +38,24 @@ export default function FireButton({
       styles.container,
       position === 'left' ? styles.containerLeft : styles.containerRight
     ]}>
+      {/* Touch-down fires the first shot; completed touch must not fire twice. */}
       <TouchableOpacity
         style={[styles.button, disabled && styles.buttonDisabled]}
-        onPress={onFire}
+        onPress={onPressIn ? undefined : onFire}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
         disabled={disabled}
         activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Fire weapon"
+        accessibilityHint={onPressIn ? 'Hold to fire repeatedly' : 'Tap to fire'}
+        accessibilityState={{ disabled }}
+        {...(onPressIn ? {
+          accessibilityActions: [{ name: 'activate', label: 'Fire weapon' }],
+          onAccessibilityAction: event => {
+            if (!disabled && event.nativeEvent.actionName === 'activate') onFire?.();
+          },
+        } : {})}
       >
         <Text style={styles.buttonText}>FIRE</Text>
       </TouchableOpacity>

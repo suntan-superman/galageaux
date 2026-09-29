@@ -3,7 +3,7 @@ import { Rect, Group } from '@shopify/react-native-skia';
 import { PALETTE } from '../constants/visualTheme';
 
 export default function BossHealthBar({ health, maxHealth, trailingHealth = health, x, y, width = 200, height = 10,
-  accent = PALETTE.boss, phaseThresholds = [], phasePulse = 0 }) {
+  accent = PALETTE.boss, phaseThresholds = [], phasePulse = 0, hitPulse = 0 }) {
   if (!health || !maxHealth || health <= 0) return null;
   
   const healthPercent = Math.max(0, Math.min(1, health / maxHealth));
@@ -31,6 +31,8 @@ export default function BossHealthBar({ health, maxHealth, trailingHealth = heal
           color={barColor}
         />
       )}
+      {hitPulse > 0 && barWidth > 0 && <Rect x={x + 2} y={y + 2} width={barWidth}
+        height={height - 4} color={PALETTE.core} opacity={Math.min(0.55, hitPulse * 0.5)} />}
       {phaseThresholds.filter(value => value > 0 && value < maxHealth).map(value => (
         <Rect key={value} x={x + 2 + (width - 4) * value / maxHealth - 0.5}
           y={y + 1} width={1} height={height - 2} color={PALETTE.core} opacity={0.44} />
@@ -42,7 +44,7 @@ export default function BossHealthBar({ health, maxHealth, trailingHealth = heal
         height={height}
         color="rgba(255,255,255,0.3)"
         style="stroke"
-        opacity={Math.min(1, 0.7 + phasePulse * 0.3)}
+        opacity={Math.min(1, 0.7 + Math.max(phasePulse, hitPulse) * 0.3)}
       />
     </Group>
   );

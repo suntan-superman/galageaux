@@ -20,6 +20,7 @@ jest.mock('../../engine/audio', () => ({
   getAudioSettings: jest.fn(),
 }));
 jest.mock('../../scenes/GameScreen', () => 'GameScreen');
+jest.mock('../../scenes/ShowMeDemo', () => 'ShowMeDemo');
 jest.mock('../../scenes/AuthScreen', () => 'AuthScreen');
 jest.mock('../../scenes/AchievementsScreen', () => 'AchievementsScreen');
 jest.mock('../../scenes/SettingsScreen', () => 'SettingsScreen');
@@ -102,6 +103,17 @@ it('requests menu music again on return without rereading or rewriting restored 
   expect(Audio.playMusic.mock.calls).toEqual([['menu'], ['menu']]);
   expect(AsyncStorage.getItem).toHaveBeenCalledTimes(1);
   expect(AsyncStorage.setItem).not.toHaveBeenCalled();
+});
+
+it('routes SHOW ME HOW to a replayable demo without starting a campaign until Play Now', async () => {
+  await mount(); await press(1);
+  expect(renderer.root.findAllByType('GameScreen')).toHaveLength(0);
+  const demo = renderer.root.findByType('ShowMeDemo');
+  await act(async () => demo.props.onBack());
+  expect(renderer.root.findAllByType('ShowMeDemo')).toHaveLength(0);
+  await press(1);
+  await act(async () => renderer.root.findByType('ShowMeDemo').props.onPlay());
+  expect(renderer.root.findAllByType('GameScreen')).toHaveLength(1);
 });
 
 it('waits for the same pending initialization when returning rapidly to the menu', async () => {

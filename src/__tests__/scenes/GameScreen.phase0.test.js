@@ -246,7 +246,7 @@ describe('mounted production GameScreen frame contract', () => {
     }
     expect(props('ScorePopup')).toMatchObject({ offsetX: 4.5, offsetY: -2.7 });
     expect(screen.root.findByType('BossHealthBar').parent.type).toBe('Canvas');
-    expect(props('BossHealthBar')).toMatchObject({ x: 100, y: 147, health: 80 });
+    expect(props('BossHealthBar')).toMatchObject({ x: 76, y: 155, width: 248, health: 80 });
     expect(screen.root.findByType('Background').parent.type).toBe('Canvas');
     const world = screen.root.findByType('Group');
     expect(world.children[world.children.length - 1].type).toBe('EnemyBullets');
@@ -260,8 +260,41 @@ describe('mounted production GameScreen frame contract', () => {
     expect(screen.root.findAllByType('BossHealthBar')).toHaveLength(0);
     await advance(3.2);
     expect(props('BossShip').boss.encounterState).toBe(BOSS_STATE.READY);
-    expect(props('BossHealthBar')).toMatchObject({ health: 100, y: 147 });
+    expect(props('BossHealthBar')).toMatchObject({ health: 100, y: 155 });
     expect(screen.root.findAllByType('StageCompleteOverlay')[0].props.visible).toBe(false);
+  });
+  it('places the boss strip beneath the measured HUD, or below the hull when text grows', async () => {
+    const seed = Simulation.createGameSession(400, 800);
+    seed.phase = 'boss'; seed.bossSpawned = true; seed.initialWaveSpawned = true;
+    seed.boss = { ...createBossEncounter('stage1', 400, 800), y: 178,
+      encounterState: BOSS_STATE.READY };
+    jest.spyOn(Simulation, 'createGameSession').mockReturnValueOnce(seed);
+    await mount(false);
+    expect(props('GameHUD')).toMatchObject({ top: 67, isBossEncounter: true });
+    expect(props('BossHealthBar').y).toBe(155);
+    await act(async () => props('GameHUD').onLayout({ nativeEvent: { layout: { height: 82 } } }));
+    expect(props('BossHealthBar').y).toBe(270);
+    expect(props('BossHealthBar').y - 23).toBeGreaterThan(seed.boss.y + seed.boss.height);
+  });
+  it('shows true numeric boss HP and a brief HIT cue only after a successful shot', async () => {
+    const seed = Simulation.createGameSession(400, 800);
+    seed.phase = 'boss'; seed.bossSpawned = true; seed.initialWaveSpawned = true;
+    seed.boss = { ...createBossEncounter('stage1', 400, 800), y: 178, hp: 80,
+      encounterState: BOSS_STATE.READY };
+    seed.bullets = [{ id: '1:contact', x: seed.boss.x + 8, y: 186,
+      width: 4, height: 14, vx: 0, vy: 0 }];
+    jest.spyOn(Simulation, 'createGameSession').mockReturnValueOnce(seed);
+    await mount(false);
+    const bossStatus = () => screen.root.findAllByType('Text')
+      .map(node => React.Children.toArray(node.props.children).join(''))
+      .find(value => value.includes(' HP'));
+    expect(bossStatus()).toBe('80/100 HP');
+    await frame(16); await frame(16);
+    expect(props('BossHealthBar').health).toBe(79);
+    expect(props('BossHealthBar').hitPulse).toBeGreaterThan(0);
+    expect(bossStatus()).toBe('HIT · 79/100 HP');
+    await advance(0.4);
+    expect(bossStatus()).toBe('79/100 HP');
   });
   it('Phase 3: hides health at zero HP and delays Stage Complete until destruction ends', async () => {
     const seed = Simulation.createGameSession(400, 800);
@@ -280,5 +313,33 @@ describe('mounted production GameScreen frame contract', () => {
     await advance(1.4);
     expect(props('StageCompleteOverlay').visible).toBe(true);
     expect(screen.root.findAllByType('BossHealthBar')).toHaveLength(0);
+  });
+  it('holds FIRE at the existing engine cooldown, then stops immediately on release', async () => {
+    await mount(false);
+    const shotCount = () => Audio.playSound.mock.calls.filter(([cue]) => cue === 'playerShoot').length;
+    await act(async () => props('FireButton').onPressIn());
+    expect(shotCount()).toBe(1);
+    expect(props('FireButton').disabled).toBe(false);
+    await advance(0.7);
+    expect(shotCount()).toBeGreaterThanOrEqual(3);
+    await act(async () => props('FireButton').onPressOut());
+    const released = shotCount();
+    await advance(0.5);
+    expect(shotCount()).toBe(released);
+  });
+  it('clears held FIRE when paused and does not resume stale held input', async () => {
+    await mount(false);
+    const shotCount = () => Audio.playSound.mock.calls.filter(([cue]) => cue === 'playerShoot').length;
+    await act(async () => props('FireButton').onPressIn());
+    await advance(0.3);
+    await act(async () => props('GameHUD').onPauseToggle());
+    const paused = shotCount();
+    await advance(0.5);
+    expect(shotCount()).toBe(paused);
+    await act(async () => props('PauseOverlay').onResume());
+    await advance(0.5);
+    expect(shotCount()).toBe(paused);
+    await act(async () => props('FireButton').onPressIn());
+    expect(shotCount()).toBe(paused + 1);
   });
 });

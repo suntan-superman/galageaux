@@ -36,12 +36,14 @@ export default function GameScreen({ onExit, showTutorial = false }) {
   const presentationRef = useRef(null);
   if (!presentationRef.current) presentationRef.current = createPresentationState(sessionRef.current);
   const [snapshot, setSnapshot] = useState(sessionRef.current);
+  const [hudHeight, setHudHeight] = useState(58);
   const [tiltControlEnabled, setTiltControlEnabled] = useState(true);
   const [achievementToast, setAchievementToast] = useState(null);
   const mounted = useRef(false);
   const achievementQueue = useRef(Promise.resolve());
   const startedSession = useRef(null);
   const lastTimeRef = useRef(null);
+  const fireHeldRef = useRef(false);
   const frameRef = useRef(null);
   const { stars, updateStars, resetStars } = useStarField(width, height);
   const {
@@ -59,7 +61,6 @@ export default function GameScreen({ onExit, showTutorial = false }) {
   const showGuide = phase === 'tutorial';
   const inBonusRound = bonusTimeLeft > 0;
   const stageComplete = phase === 'transition' || phase === 'won';
-  const canFire = snapshot.fireCooldown <= 0;
   const levelTarget = getLevelTarget(level);
   const controlsStopped = !isGameplayActive(snapshot);
   const dismissAchievement = () => {
@@ -103,7 +104,7 @@ export default function GameScreen({ onExit, showTutorial = false }) {
     const dt = Math.min(MAX_FRAME_SECONDS, Math.max(0, elapsed));
     if (isGameplayActive(state)) {
       const playerX = updateTilt(dt, state.player.x);
-      commit(stepGameSession({ ...state, width, height }, dt, { playerX }), dt);
+      commit(stepGameSession({ ...state, width, height }, dt, { playerX, firePressed: fireHeldRef.current }), dt);
       updateStars(dt);
     } else if (state.phase === 'transition' || state.phase === 'bossDeath') {
       commit(stepGameSession(state, dt), dt);
@@ -129,10 +130,11 @@ export default function GameScreen({ onExit, showTutorial = false }) {
     const subscription = AppState.addEventListener('change', next => {
       lastTimeRef.current = null;
       // Backgrounding pauses play; resuming gameplay requires the existing Resume action.
-      if (next !== 'active') command({ type: 'pause' });
+      if (next !== 'active') { fireHeldRef.current = false; command({ type: 'pause' }); }
     });
     return () => {
       mounted.current = false;
+      fireHeldRef.current = false;
       cancelAnimationFrame(id);
       subscription.remove();
       AudioManager.pauseMusic();
@@ -161,32 +163,51 @@ export default function GameScreen({ onExit, showTutorial = false }) {
   const resetGame = () => {
     const fresh = createGameSession(width, height, false, sessionRef.current.sessionId + 1);
     presentationRef.current = createPresentationState(fresh);
+    fireHeldRef.current = false;
     sessionRef.current = fresh; setSnapshot(fresh);
     startedSession.current = fresh.sessionId;
     setAchievementToast(null); resetStars(); lastTimeRef.current = null;
     consumeEvents([{ type: 'gameStarted' }, { type: 'music', track: 'gameplay' }], fresh);
   };
   const handlePauseToggle = () => {
+    fireHeldRef.current = false;
     lastTimeRef.current = null;
     command({ type: sessionRef.current.phase === 'paused' ? 'resume' : 'pause' });
   };
-  const handleResume = () => { lastTimeRef.current = null; command({ type: 'resume' }); };
-  const handleExitToMenu = () => { command({ type: 'pause' }); onExit(); };
-  const handleGuideDismiss = () => { lastTimeRef.current = null; command({ type: 'start' }); };
+  const handleResume = () => { fireHeldRef.current = false; lastTimeRef.current = null; command({ type: 'resume' }); };
+  const handleExitToMenu = () => { fireHeldRef.current = false; command({ type: 'pause' }); onExit(); };
+  const handleGuideDismiss = () => { fireHeldRef.current = false; lastTimeRef.current = null; command({ type: 'start' }); };
   const handleAutoToggle = () => command({ type: 'toggleAutoFire' });
   const fireWeapon = () => command({ type: 'fire' });
+  const beginFireHold = () => {
+    if (!isGameplayActive(sessionRef.current)) return;
+    fireHeldRef.current = true;
+    fireWeapon();
+  };
+  const endFireHold = () => { fireHeldRef.current = false; };
 
   const { ox, oy } = getWorldOffset(snapshot.screenOffset);
   const presentation = presentationRef.current;
   const hitFlashes = getHitFlashes(particles);
   const damageFlash = getDamageFlash(playerHitFlash);
   const hudScale = 1 + hudPulse * 0.08;
-  const fireButtonDisabled = !canFire || controlsStopped;
-  const bossBarY = Math.max(130, (initialWindowMetrics?.insets.top || 0) + 88);
+  // Keep the touch responder active through cooldown so a held press repeats.
+  const fireButtonDisabled = controlsStopped;
+  const hudTop = Math.max(40, (initialWindowMetrics?.insets.top || 0) + 8);
+  const bossBarWidth = Math.min(248, width - 48);
+  const bossCombatY = boss?.targetY ?? Math.min(height * 0.27, 178);
+  const preferredBossBarY = hudTop + hudHeight + 30;
+  // If large accessibility text pushes the HUD into the boss lane, use the
+  // clear space below the ship instead of covering either the HUD or hull.
+  const bossBarY = preferredBossBarY <= bossCombatY - 21 ? preferredBossBarY
+    : Math.min(height - 42, bossCombatY + (boss?.height || 60) + 32);
   const bossBarVisible = boss?.alive && ![BOSS_STATE.ANNOUNCING, BOSS_STATE.ENTERING].includes(boss.encounterState);
   const bossIdentity = BOSS_IDENTITY[currentStage];
   const phasePulse = boss?.encounterState === BOSS_STATE.PHASE_TRANSITION
     ? Math.sin(Math.PI * Math.min(1, boss.stateElapsed / bossIdentity.phaseChange)) : 0;
+  const bossHitPulse = boss?.alive && Number.isFinite(presentation.bossHealth)
+    ? Math.min(1, Math.max(0, (presentation.bossHealth - boss.hp) / 0.9)) : 0;
+  const bossHitVisible = bossHitPulse > 0.15;
 
   return (
     <View style={styles.container} {...panHandlers}>
@@ -221,14 +242,21 @@ export default function GameScreen({ onExit, showTutorial = false }) {
         <EnemyBullets bullets={enemyBullets} ox={0} oy={0} />
         </Group>
         {bossBarVisible && <BossHealthBar health={boss.hp} maxHealth={boss.maxHp}
-          trailingHealth={presentation.bossHealth} x={width / 2 - 100} y={bossBarY} width={200} height={10}
+          trailingHealth={presentation.bossHealth} x={(width - bossBarWidth) / 2} y={bossBarY}
+          width={bossBarWidth} height={11} hitPulse={bossHitPulse}
           accent={bossIdentity.phaseColors[Math.min(boss.phaseIndex || 0, bossIdentity.phaseColors.length - 1)]} phasePulse={phasePulse}
           phaseThresholds={bossConfig[currentStage].phases.map(phase => phase.hpThreshold)} />}
       </Canvas>
 
-      <BossAnnouncement boss={boss} stage={currentStage} top={bossBarY + 15} />
-      {bossBarVisible && <View pointerEvents="none" style={[styles.bossName, { top: bossBarY - 19 }]}>
-        <Text style={[styles.bossNameText, { color: bossIdentity.color }]}>{bossIdentity.name}</Text>
+      <BossAnnouncement boss={boss} stage={currentStage} top={hudTop + hudHeight + 15} />
+      {bossBarVisible && <View pointerEvents="none" style={[styles.bossStatus,
+        { top: bossBarY - 23, left: (width - bossBarWidth) / 2, width: bossBarWidth }]}>
+        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}
+          style={[styles.bossNameText, { color: bossIdentity.color }]}>{bossIdentity.name}</Text>
+        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}
+          style={[styles.bossHpText, bossHitVisible && styles.bossHpHit]}>
+          {bossHitVisible ? 'HIT · ' : ''}{boss.hp}/{boss.maxHp} HP
+        </Text>
       </View>}
 
       <HitFlash intensity={damageFlash} />
@@ -244,7 +272,16 @@ export default function GameScreen({ onExit, showTutorial = false }) {
         lives={player.lives}
         hasShield={player.shield}
         isPaused={isPaused}
+        isBossEncounter={phase === 'boss' || phase === 'bossDeath'}
+        bossDefeated={phase === 'bossDeath'}
         hudScale={hudScale}
+        top={hudTop}
+        onLayout={event => {
+          const measured = event.nativeEvent?.layout?.height;
+          if (Number.isFinite(measured) && measured > 0) {
+            setHudHeight(previous => Math.abs(previous - measured) > 0.5 ? measured : previous);
+          }
+        }}
         onPauseToggle={handlePauseToggle}
         onExit={handleExitToMenu}
       />
@@ -254,6 +291,8 @@ export default function GameScreen({ onExit, showTutorial = false }) {
         disabled={fireButtonDisabled}
         autoFire={autoFire}
         onFire={fireWeapon}
+        onPressIn={beginFireHold}
+        onPressOut={endFireHold}
         visible={player.alive && !gameOver && phase !== 'won' && phase !== 'bossDeath'}
       />
 
@@ -309,6 +348,10 @@ export default function GameScreen({ onExit, showTutorial = false }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'black' },
   canvas: { flex: 1 },
-  bossName: { position: 'absolute', left: 90, right: 90, alignItems: 'center' },
-  bossNameText: { fontSize: 11, fontWeight: '800', letterSpacing: 1.4 },
+  bossStatus: { position: 'absolute', flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', gap: 6, minHeight: 18, paddingHorizontal: 3,
+    backgroundColor: 'rgba(2, 6, 23, 0.75)' },
+  bossNameText: { fontSize: 12, fontWeight: '800', letterSpacing: 0.5, flexShrink: 1 },
+  bossHpText: { color: '#e2e8f0', fontSize: 12, fontWeight: '700', flexShrink: 1 },
+  bossHpHit: { color: '#ffffff' },
 });

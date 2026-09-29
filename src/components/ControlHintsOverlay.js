@@ -19,60 +19,52 @@ export default function ControlHintsOverlay({ visible, onDismiss, onBack }) {
         <Text style={styles.title}>🚀 How to Play</Text>
         <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
           <View style={styles.section}>
-            <Text style={styles.label}>📍 Movement</Text>
+            <Text style={styles.label}>📍 Move</Text>
             <Text style={styles.value}>
-              • Tilt your device left/right to move (or drag on screen){'\n'}
-              • Adjust sensitivity in Pause menu (⚙️)
+              • Tilt left or right to steer.{'\n'}
+              • Prefer dragging? Turn Tilt Control off in Pause, then drag the ship left or right.
             </Text>
           </View>
           <View style={styles.section}>
-            <Text style={styles.label}>💥 Firing</Text>
+            <Text style={styles.label}>💥 Fire</Text>
             <Text style={styles.value}>
-              • Tap the FIRE button to shoot{'\n'}
-              • Enable Auto-Fire in Pause menu for continuous shooting{'\n'}
-              • Move the FIRE button to left/right side in settings
+              • Tap FIRE for one shot, or hold it to keep firing.{'\n'}
+              • Turn Auto-Fire on in Pause to shoot continuously while you steer.
             </Text>
           </View>
           <View style={styles.section}>
-            <Text style={styles.label}>⭐ Power-ups</Text>
+            <Text style={styles.label}>🎯 Score & advance</Text>
             <Text style={styles.value}>
-              • Collect glowing orbs dropped by enemies{'\n'}
-              • Spread Shot: Fire multiple bullets{'\n'}
-              • Shield: Temporary protection{'\n'}
-              • Rapid Fire: Faster shooting speed{'\n'}
-              • Slow: Slows down enemies
+              • Line up beneath ordinary enemies and shoot them for points.{'\n'}
+              • Consecutive kills raise your combo and earn more points.{'\n'}
+              • The Level 0/8-style counter tracks ordinary-enemy kills, not boss health.
             </Text>
           </View>
           <View style={styles.section}>
-            <Text style={styles.label}>🎯 Objectives</Text>
+            <Text style={styles.label}>🛡️ Get a shield</Text>
             <Text style={styles.value}>
-              • Destroy enemies to earn points{'\n'}
-              • Complete levels by reaching kill targets{'\n'}
-              • Survive bonus shoot-out rounds{'\n'}
-              • Defeat bosses for massive points
+              • Defeated ordinary enemies occasionally drop a glowing shield-shaped badge. Move into it to collect it.{'\n'}
+              • A shield lasts four seconds or absorbs one hit. Points do not unlock shields.
             </Text>
           </View>
           <View style={styles.section}>
-            <Text style={styles.label}>💚 Lives & Shield</Text>
+            <Text style={styles.label}>👾 Defeat a boss</Text>
             <Text style={styles.value}>
-              • You start with 3 lives{'\n'}
-              • Shield protects you from one hit{'\n'}
-              • Watch the HUD for your status{'\n'}
-              • Game Over when all lives are lost
+              • The long colored bar above the boss is its health. Keep hitting it; one shot is not enough.{'\n'}
+              • Dodge its orange projectiles, then aim at it again. Defeating it awards 1,000 points.
             </Text>
           </View>
           <View style={styles.section}>
-            <Text style={styles.label}>⏸️ Pause Menu</Text>
+            <Text style={styles.label}>❤️ Stay alive</Text>
             <Text style={styles.value}>
-              • Tap Pause to access settings{'\n'}
-              • Toggle Auto-Fire and Tilt Control{'\n'}
-              • Adjust Tilt Sensitivity (1-10){'\n'}
-              • Move Fire Button position
+              • You start with five lives. Shield ONLINE means the next hit is blocked.{'\n'}
+              • Open Pause to change controls or move the FIRE button to the other side.
             </Text>
           </View>
         </ScrollView>
 
-        <TouchableOpacity style={styles.button} onPress={onDismiss}>
+        <TouchableOpacity style={styles.button} onPress={onDismiss}
+          accessibilityRole="button" accessibilityLabel="Close how to play guide">
           <Text style={styles.buttonText}>Got It! Let's Play</Text>
         </TouchableOpacity>
       </View>

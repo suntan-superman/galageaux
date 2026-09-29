@@ -68,6 +68,15 @@ describe('Phase 3 boss presentation contracts', () => {
     expect(markers.map(node => node.props.x)).toEqual([238.7, 179.9]);
   });
 
+  it('flashes only the true filled portion on a successful hit without inventing HP', () => {
+    const drawn = nodes(BossHealthBar({ health: 25, maxHealth: 100, trailingHealth: 50,
+      x: 100, y: 147, width: 200, height: 10, hitPulse: 1 }));
+    expect(drawn.find(node => node.type === 'Rect' && node.props.opacity === 0.5)
+      .props.width).toBe(49);
+    expect(drawn.find(node => node.type === 'Rect' && node.props.opacity === 0.45)
+      .props.width).toBe(98);
+  });
+
   it('announces by simulation clock without intercepting touch', () => {
     const announcing = { ...boss, encounterState: BOSS_STATE.ANNOUNCING, stateElapsed: 0.5 };
     expect(BossAnnouncement({ boss: { ...announcing, stateElapsed: 0.2 }, stage: 'stage2' })).toBeNull();
