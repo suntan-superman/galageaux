@@ -120,9 +120,9 @@ export const ACHIEVEMENTS = {
   legend: {
     id: 'legend',
     title: 'Legend',
-    description: 'Reach level 10',
+    description: 'Reach level 6',
     icon: '🌟',
-    requirement: { type: 'level', value: 10 }
+    requirement: { type: 'level', value: 6 }
   }
 };
 
@@ -162,6 +162,14 @@ async function readAchievements() {
       achievementState.stats = { ...achievementState.stats, ...JSON.parse(statsData) };
     }
 
+    // The V1 Legend threshold was lowered from an unreachable level 10 to 6.
+    // Honor an existing player's recorded max level without waiting for a new run.
+    if (achievementState.stats.maxLevel >= ACHIEVEMENTS.legend.requirement.value
+      && achievementState.unlocked.legend !== true) {
+      achievementState.unlocked.legend = true;
+      await saveAchievements();
+    }
+
     achievementState.loaded = true;
   } catch (error) {
     console.error('Failed to load achievements:', error);
@@ -171,6 +179,9 @@ async function readAchievements() {
 export function loadAchievements() {
   // Startup and the first gameplay update can request the same stored snapshot.
   // Share that read so a late response cannot overwrite already-applied deltas.
+  // Once loaded, the in-memory state is authoritative until the next JS launch:
+  // a gallery visit must not reread stale storage while a save is still pending.
+  if (achievementState.loaded) return Promise.resolve();
   if (!loadingAchievements) {
     loadingAchievements = readAchievements().finally(() => {
       loadingAchievements = null;
@@ -212,7 +223,7 @@ export function isAchievementUnlocked(achievementId) {
  * Get all unlocked achievements
  */
 export function getUnlockedAchievements() {
-  return Object.keys(achievementState.unlocked).filter(id => achievementState.unlocked[id]);
+  return Object.keys(ACHIEVEMENTS).filter(isAchievementUnlocked);
 }
 
 /**

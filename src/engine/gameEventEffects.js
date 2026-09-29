@@ -83,7 +83,13 @@ export function playGameEventSounds(events) {
         Audio.playSound('levelUp', 0.8);
         break;
       case 'sessionEnded':
-        if (event.outcome === 'lost') Audio.playSound('playerDeath', 0.9);
+        if (event.outcome === 'lost') {
+          Audio.playSound('playerDeath', 0.9);
+          Audio.playMusic('gameOver');
+        } else if (event.outcome === 'won') {
+          // Victory's cue precedes this event; leave the completed campaign quiet.
+          Audio.stopMusic();
+        }
         break;
       case 'music':
         Audio.playMusic(event.track);

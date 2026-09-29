@@ -3,6 +3,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import * as Audio from '../../engine/audio';
 import * as Achievements from '../../engine/achievements';
 import * as Simulation from '../../engine/gameSimulation';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState } from 'react-native';
 import { createEnemy } from '../../engine/spawner';
 import { calculateDifficultySettings } from '../../engine/difficulty';
@@ -30,7 +31,7 @@ jest.mock('../../components/BonusBanner', () => 'BonusBanner');
 jest.mock('../../components/StageCompleteOverlay', () => 'StageCompleteOverlay');
 jest.mock('../../components/HitFlash', () => 'HitFlash');
 jest.mock('../../scenes/GameOverOverlay', () => 'GameOverOverlay');
-jest.mock('../../engine/audio', () => ({ initializeAudio: jest.fn(async () => {}), playMusic: jest.fn(async () => {}), pauseMusic: jest.fn(), playSound: jest.fn(), setMusicTempo: jest.fn() }));
+jest.mock('../../engine/audio', () => ({ initializeAudio: jest.fn(async () => {}), playMusic: jest.fn(async () => {}), pauseMusic: jest.fn(), stopMusic: jest.fn(), playSound: jest.fn(), setMusicTempo: jest.fn() }));
 jest.mock('../../engine/achievements', () => ({
   loadAchievements: jest.fn(async () => {}), checkAchievements: jest.fn(async () => []),
 }));
@@ -51,7 +52,9 @@ describe('mounted production GameScreen frame contract', () => {
     await act(async () => callbacks.forEach(callback => callback(now)));
   };
   const advance = async seconds => { for (let i = 0; i < seconds * 60; i++) await frame(1000 / 60); };
-  const mount = async tutorial => { await act(async () => { screen = TestRenderer.create(<GameScreen onExit={jest.fn()} showTutorial={tutorial} />); }); };
+  const mount = async (tutorial, extraProps = {}) => { await act(async () => {
+    screen = TestRenderer.create(<GameScreen onExit={jest.fn()} showTutorial={tutorial} {...extraProps} />);
+  }); };
   beforeEach(() => {
     global.IS_REACT_ACT_ENVIRONMENT = true;
     jest.useFakeTimers({ doNotFake: ['Date', 'performance'] });
@@ -61,6 +64,8 @@ describe('mounted production GameScreen frame contract', () => {
     global.requestAnimationFrame = jest.fn(callback => { raf.set(++nextId, callback); return nextId; });
     global.cancelAnimationFrame = jest.fn(id => raf.delete(id));
     jest.clearAllMocks();
+    AsyncStorage.getItem.mockReset().mockResolvedValue(null);
+    AsyncStorage.setItem.mockReset().mockResolvedValue();
     Achievements.checkAchievements.mockReset().mockResolvedValue([]);
   });
   afterEach(async () => { if (screen) await act(async () => screen.unmount()); screen = null; jest.restoreAllMocks(); jest.useRealTimers(); });
@@ -70,6 +75,31 @@ describe('mounted production GameScreen frame contract', () => {
     await advance(3);
     expect(props('Enemies').enemies).toHaveLength(0);
     expect(props('GameHUD').score).toBe(0);
+  });
+  it('shows a short nonblocking cue once for direct first PLAY, then persists dismissal', async () => {
+    const saved = new Map();
+    AsyncStorage.getItem.mockImplementation(async key => saved.get(key) ?? null);
+    AsyncStorage.setItem.mockImplementation(async (key, value) => { saved.set(key, value); });
+    await mount(false, { showFirstPlayCue: true });
+    const cue = () => screen.root.findAllByType('Text').some(node => node.props.children === 'TILT TO MOVE · HOLD FIRE TO SHOOT');
+    expect(cue()).toBe(true);
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith('galageaux:firstPlayCueSeen', '1');
+    const cueView = screen.root.findAllByType('View').find(node => node.props.style?.[0]?.borderColor === 'rgba(88,202,250,0.55)');
+    expect(cueView.props.pointerEvents).toBe('none');
+    await act(async () => jest.advanceTimersByTime(3800));
+    expect(cue()).toBe(false);
+    await act(async () => screen.unmount()); screen = null;
+    await mount(false, { showFirstPlayCue: true });
+    expect(cue()).toBe(false);
+  });
+  it('offers Pause as the only in-run quit path without finalizing an abandoned score', async () => {
+    const onExit = jest.fn();
+    await mount(false, { onExit });
+    expect(props('GameHUD').onExit).toBeUndefined();
+    await act(async () => props('GameHUD').onPauseToggle());
+    await act(async () => props('PauseOverlay').onExit());
+    expect(onExit).toHaveBeenCalledTimes(1);
+    expect(Achievements.checkAchievements.mock.calls.some(([update]) => 'totalScore' in update)).toBe(false);
   });
   it('inserts each timed spawn exactly once', async () => {
     await mount(false);
@@ -167,6 +197,40 @@ describe('mounted production GameScreen frame contract', () => {
     expect(screen.root.findAllByType('AchievementToast')).toHaveLength(0);
     await act(async () => jest.advanceTimersByTime(5000));
     expect(props('GameHUD').level).toBe(1);
+  });
+  it('presents simultaneous unlocks in order and ignores an old dismissal', async () => {
+    Achievements.checkAchievements.mockResolvedValueOnce([{ id: 'first' }, { id: 'second' }]);
+    await mount(false);
+    expect(props('AchievementToast').achievement.id).toBe('first');
+    const oldDismiss = props('AchievementToast').onDismiss;
+    await act(async () => oldDismiss());
+    expect(props('AchievementToast').achievement.id).toBe('second');
+    await act(async () => oldDismiss());
+    expect(props('AchievementToast').achievement.id).toBe('second');
+    await act(async () => props('AchievementToast').onDismiss());
+    expect(screen.root.findAllByType('AchievementToast')).toHaveLength(0);
+  });
+  it('passes the final campaign score to victory without changing terminal state', async () => {
+    const seed = Simulation.createGameSession(400, 800);
+    seed.phase = 'won'; seed.currentStage = 'stage3'; seed.score = 12345;
+    jest.spyOn(Simulation, 'createGameSession').mockReturnValueOnce(seed);
+    await mount(false);
+    expect(props('StageCompleteOverlay')).toMatchObject({ visible: true, score: 12345, currentStage: 'stage3' });
+    await frame(1000);
+    expect(props('StageCompleteOverlay')).toMatchObject({ visible: true, score: 12345 });
+  });
+  it('waits for committed statistics before returning to a menu that can open Stats', async () => {
+    let finish;
+    const onExit = jest.fn();
+    Achievements.checkAchievements.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    await mount(false, { onExit });
+    await act(async () => props('GameHUD').onPauseToggle());
+    let exitPromise;
+    await act(async () => { exitPromise = props('PauseOverlay').onExit(); });
+    expect(onExit).not.toHaveBeenCalled();
+    await act(async () => finish([]));
+    await act(async () => exitPromise);
+    expect(onExit).toHaveBeenCalledTimes(1);
   });
   it('ignores an old-session achievement completion after retry', async () => {
     let finish;

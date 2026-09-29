@@ -5,6 +5,7 @@ import * as AudioManager from '../../engine/audio';
 import SettingsScreen from '../../scenes/SettingsScreen';
 import PauseOverlay from '../../components/PauseOverlay';
 import { PLAYER, STORAGE_KEYS } from '../../constants/game';
+import { Linking } from 'react-native';
 
 jest.mock('react-native', () => ({
   View: 'View', Text: 'Text', ScrollView: 'ScrollView',
@@ -62,4 +63,42 @@ it('uses fractional adjustments and the same sensitivity bounds in pause control
   expect(renderer.root.findAllByType('TouchableOpacity')[4].props.disabled).toBe(true);
   await act(async () => { renderer.update(<PauseOverlay {...base} tiltSensitivity={3} />); });
   expect(renderer.root.findAllByType('TouchableOpacity')[5].props.disabled).toBe(true);
+});
+
+it('shows only persistent controls, resets only their keys, and keeps legal links outside Pause', async () => {
+  await act(async () => { renderer = create(<SettingsScreen />); });
+  const labels = renderer.root.findAllByType('Text').map(node => node.props.children);
+  expect(labels).not.toContain('Auto-Fire');
+  expect(labels).not.toContain('Tilt Control');
+  const terms = renderer.root.findByProps({ accessibilityLabel: 'Terms of Service' });
+  const privacy = renderer.root.findByProps({ accessibilityLabel: 'Privacy Policy' });
+  await act(async () => { terms.props.onPress(); privacy.props.onPress(); });
+  expect(Linking.openURL.mock.calls).toEqual([
+    ['https://galageaux.com/terms'], ['https://galageaux.com/privacy'],
+  ]);
+  const reset = renderer.root.findAllByType('TouchableOpacity')
+    .find(node => node.findAllByType('Text').some(text => text.props.children === 'Reset to Defaults'));
+  await act(async () => reset.props.onPress());
+  expect(AsyncStorage.multiRemove).toHaveBeenCalledWith([
+    STORAGE_KEYS.AUDIO_SETTINGS, STORAGE_KEYS.TILT_SENSITIVITY, STORAGE_KEYS.FIRE_BUTTON_POSITION,
+  ]);
+});
+
+it('alerts when a setting cannot be persisted instead of implying it was saved', async () => {
+  const warning = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    AsyncStorage.setItem.mockRejectedValueOnce(new Error('storage unavailable'));
+    await act(async () => { renderer = create(<SettingsScreen />); });
+    await act(async () => renderer.root.findAllByType('Switch')[0].props.onValueChange(false));
+    expect(renderer.root.findAllByType('Text').some(node =>
+      node.props.children === 'Settings could not be saved. Please try again.')).toBe(true);
+    expect(renderer.root.findByProps({ accessibilityRole: 'alert' })).toBeDefined();
+    const fireSide = renderer.root.findAllByType('TouchableOpacity')
+      .find(node => node.findAllByType('Text').some(text => text.props.children === 'RIGHT'));
+    await act(async () => fireSide.props.onPress());
+    expect(renderer.root.findByProps({ accessibilityRole: 'alert' })).toBeDefined();
+    await act(async () => renderer.root.findAllByType('Switch')[0].props.onValueChange(true));
+    expect(renderer.root.findAllByType('Text').some(node =>
+      node.props.children === 'Settings could not be saved. Please try again.')).toBe(false);
+  } finally { warning.mockRestore(); }
 });

@@ -7,7 +7,7 @@ const fitted = { numberOfLines: 1, adjustsFontSizeToFit: true, minimumFontScale:
 
 export default function GameHUD({ score, currentStage, level, levelKills, levelTarget,
   lives, hasShield, isPaused, isBossEncounter = false, bossDefeated = false,
-  hudScale = 1, top = 48, onLayout, onPauseToggle, onExit }) {
+  hudScale = 1, top = 48, onLayout, onPauseToggle }) {
   const stageNumber = currentStage.replace('stage', '');
   const progress = isBossEncounter
     ? bossDefeated ? 'GUARDIAN DEFEATED' : 'BOSS FIGHT · Hit the ship'
@@ -40,11 +40,6 @@ export default function GameHUD({ score, currentStage, level, levelKills, levelT
         </Text>
       </View>
     </View>
-    <View style={styles.backBtnContainer}>
-      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Exit game" onPress={onExit}>
-        <Text style={styles.backBtn}>Exit</Text>
-      </TouchableOpacity>
-    </View>
   </>;
 }
 
@@ -68,6 +63,4 @@ const styles = StyleSheet.create({
   progressText: { color: '#e2e8f0', fontSize: 11, fontWeight: '700', flex: 1, minWidth: 0, marginRight: 8 },
   shieldText: { color: '#94a3b8', fontSize: 10, fontWeight: '700', flexShrink: 1, textAlign: 'right' },
   shieldActive: { color: '#4ade80' },
-  backBtnContainer: { position: 'absolute', bottom: 30, left: 16 },
-  backBtn: { color: '#9ca3af', fontSize: 14, textDecorationLine: 'underline' },
 });

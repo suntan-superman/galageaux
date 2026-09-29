@@ -32,16 +32,21 @@ export default function App() {
     }
   };
 
+  const handleErrorToMenu = () => {
+    setShowSplash(false);
+    setErrorKey(prev => prev + 1);
+  };
+
   // Show config error screen if validation failed
   if (configChecked && configErrors && configErrors.length > 0) {
     return (
       <View style={styles.errorContainer}>
         <StatusBar barStyle="light-content" backgroundColor="#1e1e2e" />
-        <Text style={styles.errorTitle}>⚠️ Configuration Error</Text>
+        <Text style={styles.errorTitle}>UNABLE TO START</Text>
         <Text style={styles.errorSubtitle}>
-          The game configuration files have issues that need to be fixed:
+          Galageaux could not load its game data. Please close and reopen the app.
         </Text>
-        <View style={styles.errorList}>
+        {__DEV__ && <View style={styles.errorList}>
           {configErrors.slice(0, 5).map((err, idx) => (
             <Text key={idx} style={styles.errorItem}>• {err.message}</Text>
           ))}
@@ -50,9 +55,9 @@ export default function App() {
               ...and {configErrors.length - 5} more errors
             </Text>
           )}
-        </View>
+        </View>}
         <Text style={styles.errorHint}>
-          Please check the console for full error details.
+          If this continues, a new app update may be needed.
         </Text>
       </View>
     );
@@ -74,6 +79,7 @@ export default function App() {
         <GameErrorFallback 
           {...props} 
           onRetry={handleErrorRetry}
+          onExit={handleErrorToMenu}
         />
       )}
       onError={(error, errorInfo) => {

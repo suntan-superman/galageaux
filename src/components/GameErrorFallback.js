@@ -69,7 +69,7 @@ export default function GameErrorFallback({ error, errorInfo, onRetry, onExit })
         
         {/* Subtitle */}
         <Text style={styles.subtitle}>
-          Don't worry, your high scores are safe!
+          Your current run may not be saved.
         </Text>
 
         {/* Action Buttons */}

@@ -10,7 +10,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Switch
+  Switch,
+  Linking
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
@@ -28,10 +29,13 @@ export default function SettingsScreen({ onBack }) {
   const [musicVolume, setMusicVolume] = useState(0.5);
   
   // Control settings
-  const [tiltEnabled, setTiltEnabled] = useState(false);
   const [tiltSensitivity, setTiltSensitivity] = useState(PLAYER.TILT_SENSITIVITY_DEFAULT);
   const [fireButtonPosition, setFireButtonPosition] = useState('right');
-  const [autoFire, setAutoFire] = useState(false);
+  const [failedSaves, setFailedSaves] = useState({});
+  const saveFailed = Object.values(failedSaves).some(Boolean);
+  const markSaveResult = (setting, failed) => {
+    setFailedSaves(previous => ({ ...previous, [setting]: failed }));
+  };
   
   // Load saved settings
   useEffect(() => {
@@ -54,7 +58,6 @@ export default function SettingsScreen({ onBack }) {
       const tiltVal = await AsyncStorage.getItem(STORAGE_KEYS.TILT_SENSITIVITY);
       if (tiltVal) {
         setTiltSensitivity(normalizeTiltSensitivity(tiltVal));
-        setTiltEnabled(true);
       }
 
       const firePos = await AsyncStorage.getItem(STORAGE_KEYS.FIRE_BUTTON_POSITION);
@@ -80,7 +83,13 @@ export default function SettingsScreen({ onBack }) {
     AudioManager.setMusicEnabled(settings.musicEnabled);
     AudioManager.setSoundVolume(settings.soundVolume);
     AudioManager.setMusicVolume(settings.musicVolume);
-    await AsyncStorage.setItem(STORAGE_KEYS.AUDIO_SETTINGS, JSON.stringify(settings));
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.AUDIO_SETTINGS, JSON.stringify(settings));
+      markSaveResult('audio', false);
+    } catch (error) {
+      console.warn('Failed to save audio settings:', error);
+      markSaveResult('audio', true);
+    }
   };
 
   const handleSoundsToggle = (value) => {
@@ -125,39 +134,51 @@ export default function SettingsScreen({ onBack }) {
   const handleTiltSensitivityChange = async (value) => {
     const sensitivity = normalizeTiltSensitivity(value);
     setTiltSensitivity(sensitivity);
-    await AsyncStorage.setItem(STORAGE_KEYS.TILT_SENSITIVITY, String(sensitivity));
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.TILT_SENSITIVITY, String(sensitivity));
+      markSaveResult('tilt', false);
+    } catch (error) {
+      console.warn('Failed to save tilt sensitivity:', error);
+      markSaveResult('tilt', true);
+    }
   };
 
   const handleFirePositionToggle = async () => {
     const newPosition = fireButtonPosition === 'right' ? 'left' : 'right';
-    setFireButtonPosition(newPosition);
-    await AsyncStorage.setItem(STORAGE_KEYS.FIRE_BUTTON_POSITION, newPosition);
-    AudioManager.playSound('uiClick', 0.5);
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.FIRE_BUTTON_POSITION, newPosition);
+      setFireButtonPosition(newPosition);
+      markSaveResult('fire', false);
+      AudioManager.playSound('uiClick', 0.5);
+    } catch (error) {
+      console.warn('Failed to save fire button position:', error);
+      markSaveResult('fire', true);
+    }
   };
 
   const handleResetDefaults = async () => {
-    // Reset to defaults
-    setSoundsEnabled(true);
-    setMusicEnabled(true);
-    setSoundVolume(0.7);
-    setMusicVolume(0.5);
-    setTiltSensitivity(PLAYER.TILT_SENSITIVITY_DEFAULT);
-    setFireButtonPosition('right');
-    setAutoFire(false);
-    
-    // Save defaults
-    await AsyncStorage.multiRemove([
-      STORAGE_KEYS.AUDIO_SETTINGS,
-      STORAGE_KEYS.TILT_SENSITIVITY,
-      STORAGE_KEYS.FIRE_BUTTON_POSITION
-    ]);
-    
-    // Apply to audio
-    AudioManager.setSoundsEnabled(true);
-    AudioManager.setMusicEnabled(true);
-    AudioManager.setSoundVolume(0.7);
-    AudioManager.setMusicVolume(0.5);
-    AudioManager.playSound('uiClick', 0.5);
+    try {
+      await AsyncStorage.multiRemove([
+        STORAGE_KEYS.AUDIO_SETTINGS,
+        STORAGE_KEYS.TILT_SENSITIVITY,
+        STORAGE_KEYS.FIRE_BUTTON_POSITION
+      ]);
+      setSoundsEnabled(true);
+      setMusicEnabled(true);
+      setSoundVolume(0.7);
+      setMusicVolume(0.5);
+      setTiltSensitivity(PLAYER.TILT_SENSITIVITY_DEFAULT);
+      setFireButtonPosition('right');
+      AudioManager.setSoundsEnabled(true);
+      AudioManager.setMusicEnabled(true);
+      AudioManager.setSoundVolume(0.7);
+      AudioManager.setMusicVolume(0.5);
+      AudioManager.playSound('uiClick', 0.5);
+      setFailedSaves({});
+    } catch (error) {
+      console.warn('Failed to reset settings:', error);
+      markSaveResult('reset', true);
+    }
   };
 
   return (
@@ -177,6 +198,10 @@ export default function SettingsScreen({ onBack }) {
         <Text style={styles.title}>SETTINGS</Text>
         <View style={styles.spacer} />
       </View>
+
+      {saveFailed && <Text accessibilityRole="alert" style={styles.saveError}>
+        Settings could not be saved. Please try again.
+      </Text>}
 
       <ScrollView 
         style={styles.scrollView}
@@ -299,6 +324,16 @@ export default function SettingsScreen({ onBack }) {
         <View style={styles.versionSection}>
           <Text style={styles.versionText}>{APP_INFO.name} v{APP_INFO.version}</Text>
           <Text style={styles.copyrightText}>{getCopyrightText('symbol-first')}</Text>
+          <View style={styles.legalRow}>
+            <TouchableOpacity accessibilityRole="link" accessibilityLabel="Terms of Service"
+              onPress={() => Linking.openURL('https://galageaux.com/terms')} style={styles.legalLink}>
+              <Text style={styles.legalText}>Terms of Service</Text>
+            </TouchableOpacity>
+            <TouchableOpacity accessibilityRole="link" accessibilityLabel="Privacy Policy"
+              onPress={() => Linking.openURL('https://galageaux.com/privacy')} style={styles.legalLink}>
+              <Text style={styles.legalText}>Privacy Policy</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.bottomSpacer} />
@@ -344,6 +379,8 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
   },
+  saveError: { color: '#fca5a5', fontSize: 13, textAlign: 'center', paddingHorizontal: 20,
+    paddingVertical: 8 },
   section: {
     backgroundColor: 'rgba(30, 41, 59, 0.6)',
     borderRadius: 16,
@@ -439,6 +476,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
   },
+  legalRow: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: 10, marginTop: 12 },
+  legalLink: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 6 },
+  legalText: { color: '#79d7ff', fontSize: 13, textDecorationLine: 'underline' },
   bottomSpacer: {
     height: 40,
   },

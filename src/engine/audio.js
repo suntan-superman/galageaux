@@ -64,6 +64,19 @@ const audioState = {
   isLazyLoading: false
 };
 let pendingMusicPause = null;
+let initializationPromise = null;
+let musicOperation = Promise.resolve();
+let latestMusicRequest = 0;
+let desiredMusic = null;
+let currentMusicLoop = null;
+
+// Only the latest screen's music intent may own the shared native player.
+function scheduleMusic(operation) {
+  const request = ++latestMusicRequest;
+  const task = musicOperation.then(() => operation(request));
+  musicOperation = task.catch(() => {});
+  return task;
+}
 
 // Track gain is playback-only: retain the user's unscaled saved preference.
 export const MENU_MUSIC_MULTIPLIER = 0.25;
@@ -224,67 +237,61 @@ async function startLazyLoading() {
  * @param {boolean} [options.eagerLoadAll=false] - If true, loads all sounds immediately
  * @returns {Promise<{success: boolean, status: AudioStatus}>} Initialization result
  */
-export async function initializeAudio(options = {}) {
+export function initializeAudio(options = {}) {
   const { eagerLoadAll = false } = options;
   
-  if (audioState.initialized) return { success: true, status: getAudioStatus() };
-  if (audioState.initializing) return { success: false, status: getAudioStatus() };
+  if (initializationPromise) return initializationPromise;
+  if (audioState.initialized) return Promise.resolve({ success: true, status: getAudioStatus() });
 
   audioState.initializing = true;
   audioState.initError = null;
   audioState.failedSounds = [];
   audioState.totalSounds = Object.keys(SOUND_FILES).length;
   audioState.loadedSounds = 0;
-  
-  // Count critical sounds
   audioState.totalCriticalSounds = Object.values(SOUND_FILES)
     .filter(def => def.priority === 1).length;
   audioState.criticalSoundsLoaded = 0;
-  
-  notifyListeners();
 
-  try {
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: false,
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: false,
-      shouldDuckAndroid: true,
-      playThroughEarpieceAndroid: false
-    });
+  initializationPromise = (async () => {
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false
+      });
 
-    // Load priority 1 (critical) sounds first - these are essential for basic gameplay
-    await loadSoundsByPriority(1);
-    console.log(`Critical sounds loaded: ${audioState.criticalSoundsLoaded}/${audioState.totalCriticalSounds}`);
-    
-    // Load priority 2 (important) sounds
-    await loadSoundsByPriority(2);
-    
-    // Mark as initialized once priority 1 & 2 are loaded
-    // This allows gameplay to start while less important sounds load
-    audioState.initialized = true;
-    audioState.initializing = false;
-    notifyListeners();
-    
-    console.log(`Audio system initialized: ${audioState.loadedSounds}/${audioState.totalSounds} sounds loaded (priority 1-2)`);
-    
-    // Either load remaining sounds now or schedule lazy loading
-    if (eagerLoadAll) {
-      await loadSoundsByPriority(3);
-      console.log(`All sounds loaded: ${audioState.loadedSounds}/${audioState.totalSounds}`);
-    } else {
-      // Start lazy loading in background (doesn't block)
-      setTimeout(() => startLazyLoading(), 100);
+      // Load critical sounds before exposing initialized playback.
+      await loadSoundsByPriority(1);
+      console.log(`Critical sounds loaded: ${audioState.criticalSoundsLoaded}/${audioState.totalCriticalSounds}`);
+      await loadSoundsByPriority(2);
+
+      audioState.initialized = true;
+      audioState.initializing = false;
+      notifyListeners();
+
+      console.log(`Audio system initialized: ${audioState.loadedSounds}/${audioState.totalSounds} sounds loaded (priority 1-2)`);
+
+      if (eagerLoadAll) {
+        await loadSoundsByPriority(3);
+        console.log(`All sounds loaded: ${audioState.loadedSounds}/${audioState.totalSounds}`);
+      } else {
+        setTimeout(() => startLazyLoading(), 100);
+      }
+
+      return { success: true, status: getAudioStatus() };
+    } catch (error) {
+      console.error('Failed to initialize audio:', error);
+      audioState.initialized = false;
+      audioState.initializing = false;
+      audioState.initError = error.message || 'Unknown audio initialization error';
+      notifyListeners();
+      return { success: false, status: getAudioStatus() };
     }
-    
-    return { success: true, status: getAudioStatus() };
-  } catch (error) {
-    console.error('Failed to initialize audio:', error);
-    audioState.initialized = false;
-    audioState.initializing = false;
-    audioState.initError = error.message || 'Unknown audio initialization error';
-    notifyListeners();
-    return { success: false, status: getAudioStatus() };
-  }
+  })().finally(() => { initializationPromise = null; });
+  notifyListeners();
+  return initializationPromise;
 }
 
 /**
@@ -310,6 +317,7 @@ export async function ensureSoundLoaded(soundName) {
  * Retry audio initialization
  */
 export async function retryAudioInit() {
+  if (initializationPromise) return initializationPromise;
   audioState.initialized = false;
   audioState.initializing = false;
   audioState.sounds = {};
@@ -347,65 +355,84 @@ export async function playSound(soundName, volumeMultiplier = 1.0) {
  * @param {boolean} [loop=true] - Whether to loop the track
  * @returns {Promise<void>}
  */
-export async function playMusic(trackName, loop = true) {
-  // Screen cleanup cannot await native pause before another screen reenters.
-  // Wait here so that a late pause cannot silence the newly requested playback.
-  if (pendingMusicPause) await pendingMusicPause;
-  if (!audioState.musicEnabled || !audioState.initialized) return;
+export function playMusic(trackName, loop = true) {
   // Reject stale/unknown keys without tearing down the valid current track.
   const musicFile = MUSIC_FILES[trackName];
   if (!musicFile) {
     console.warn(`Music track not found: ${trackName}`);
-    return;
-  }
-  if (audioState.currentTrack === trackName && audioState.music) {
-    if (audioState.musicPaused) await resumeMusic();
-    return;
+    return Promise.resolve();
   }
 
-  try {
-    // Stop current music
-    if (audioState.music) {
-      await audioState.music.stopAsync();
-      await audioState.music.unloadAsync();
+  // Remember navigation while muted so enabling music starts the current
+  // screen's track, not the last track that happened to be loaded.
+  desiredMusic = { trackName, loop };
+  return scheduleMusic(async request => {
+    // Screen cleanup cannot await native pause before another screen reenters.
+    if (pendingMusicPause) await pendingMusicPause;
+    if (request !== latestMusicRequest) return;
+    if (!audioState.initialized && audioState.musicEnabled) await initializeAudio();
+    if (request !== latestMusicRequest || !audioState.musicEnabled || !audioState.initialized) return;
+    if (audioState.currentTrack === trackName && currentMusicLoop === loop && audioState.music) {
+      if (audioState.musicPaused) await resumeMusic();
+      return;
     }
 
-    // Load and play new track
-    const { sound } = await Audio.Sound.createAsync(
-      musicFile,
-      { shouldPlay: true, isLooping: loop, volume: musicPlaybackVolume(trackName) }
-    );
-    audioState.music = sound;
-    audioState.currentTrack = trackName;
-    audioState.musicPaused = false;
-  } catch (error) {
-    console.warn(`Failed to play music: ${trackName}`, error);
-    // Use a fallback empty sound object
-    audioState.music = {
-      stopAsync: async () => {},
-      pauseAsync: async () => {},
-      playAsync: async () => {},
-      setVolumeAsync: async () => {},
-      unloadAsync: async () => {}
-    };
-  }
+    try {
+      const previous = audioState.music;
+      audioState.music = null;
+      audioState.currentTrack = null;
+      currentMusicLoop = null;
+      audioState.musicPaused = false;
+      if (previous) {
+        await previous.stopAsync();
+        await previous.unloadAsync();
+      }
+      if (request !== latestMusicRequest || !audioState.musicEnabled) return;
+
+      const { sound } = await Audio.Sound.createAsync(
+        musicFile,
+        { shouldPlay: true, isLooping: loop, volume: musicPlaybackVolume(trackName) }
+      );
+      if (request !== latestMusicRequest || !audioState.musicEnabled) {
+        await sound.stopAsync();
+        await sound.unloadAsync();
+        return;
+      }
+      audioState.music = sound;
+      audioState.currentTrack = trackName;
+      currentMusicLoop = loop;
+      audioState.musicPaused = false;
+    } catch (error) {
+      console.warn(`Failed to play music: ${trackName}`, error);
+      if (request === latestMusicRequest) {
+        // Keep the existing graceful no-audio fallback after native failure.
+        audioState.music = createDummySound();
+      }
+    }
+  });
 }
 
 /**
  * Stop background music
  */
-export async function stopMusic() {
-  if (!audioState.music) return;
-
-  try {
-    await audioState.music.stopAsync();
-    await audioState.music.unloadAsync();
+export function stopMusic() {
+  // A terminal stop cancels any deferred request made while music was muted.
+  desiredMusic = null;
+  return scheduleMusic(async () => {
+    if (pendingMusicPause) await pendingMusicPause;
+    const previous = audioState.music;
     audioState.music = null;
     audioState.currentTrack = null;
+    currentMusicLoop = null;
     audioState.musicPaused = false;
-  } catch (error) {
-    console.warn('Failed to stop music:', error);
-  }
+    if (!previous) return;
+    try {
+      await previous.stopAsync();
+      await previous.unloadAsync();
+    } catch (error) {
+      console.warn('Failed to stop music:', error);
+    }
+  });
 }
 
 /**
@@ -489,12 +516,18 @@ export function setSoundsEnabled(enabled) {
  */
 export async function setMusicEnabled(enabled) {
   audioState.musicEnabled = enabled;
-  
-  if (!enabled && audioState.music) {
-    await pauseMusic();
-  } else if (enabled && audioState.music && audioState.currentTrack) {
-    await resumeMusic();
+
+  if (!enabled) {
+    if (audioState.music) await pauseMusic();
+    return;
   }
+
+  // Finish any request queued while muted before inspecting the latest intent.
+  // playMusic handles either resuming its loaded track or replacing a stale one.
+  await musicOperation;
+  if (!audioState.musicEnabled || !desiredMusic) return;
+  const { trackName, loop } = desiredMusic;
+  await playMusic(trackName, loop);
 }
 
 /**
@@ -533,6 +566,8 @@ export async function cleanupAudio() {
     audioState.sounds = {};
     audioState.music = null;
     audioState.currentTrack = null;
+    currentMusicLoop = null;
+    desiredMusic = null;
     audioState.musicPaused = false;
   } catch (error) {
     console.error('Failed to cleanup audio:', error);

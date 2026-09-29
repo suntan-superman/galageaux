@@ -4,7 +4,7 @@ import { createEnemy } from '../../engine/spawner';
 import { createBoss } from '../../engine/boss';
 import * as Audio from '../../engine/audio';
 
-jest.mock('../../engine/audio', () => ({ playSound: jest.fn(), playMusic: jest.fn() }));
+jest.mock('../../engine/audio', () => ({ playSound: jest.fn(), playMusic: jest.fn(), stopMusic: jest.fn() }));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(() => Promise.resolve(null)),
   setItem: jest.fn(() => Promise.resolve())
@@ -135,6 +135,23 @@ describe('production event sound mapping', () => {
   it('does not add a death cue on victory or unrelated events', () => {
     playGameEventSounds([{ type: 'sessionEnded', outcome: 'won' }, { type: 'gameStarted' }, { type: 'bossFired' }]);
     expect(Audio.playSound).not.toHaveBeenCalled();
+    expect(Audio.playMusic).not.toHaveBeenCalled();
+    expect(Audio.stopMusic).toHaveBeenCalledTimes(1);
+  });
+
+  it('changes loss to the existing game-over track and lets retry/menu events restore their tracks', () => {
+    playGameEventSounds([{ type: 'sessionEnded', outcome: 'lost' }]);
+    expect(Audio.playSound).toHaveBeenCalledWith('playerDeath', 0.9);
+    expect(Audio.playMusic).toHaveBeenCalledWith('gameOver');
+    playGameEventSounds([{ type: 'music', track: 'gameplay' }, { type: 'music', track: 'menu' }]);
+    expect(Audio.playMusic.mock.calls).toEqual([['gameOver'], ['gameplay'], ['menu']]);
+    expect(Audio.stopMusic).not.toHaveBeenCalled();
+  });
+
+  it('plays the existing victory cue and stops the boss loop once at final session end', () => {
+    playGameEventSounds([{ type: 'victory' }, { type: 'sessionEnded', outcome: 'won' }]);
+    expect(Audio.playSound.mock.calls).toEqual([['levelUp', 0.8]]);
+    expect(Audio.stopMusic).toHaveBeenCalledTimes(1);
     expect(Audio.playMusic).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AppState, View, Text, StyleSheet, useWindowDimensions } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Canvas, Group } from '@shopify/react-native-skia';
 import { initialWindowMetrics } from 'react-native-safe-area-context';
 import { createGameSession, commandGameSession, stepGameSession, isGameplayActive, MAX_FRAME_SECONDS } from '../engine/gameSimulation';
@@ -29,7 +30,9 @@ import useGameSettings from '../hooks/useGameSettings';
 import useStarField from '../hooks/useStarField';
 import usePlayerControls from '../hooks/usePlayerControls';
 
-export default function GameScreen({ onExit, showTutorial = false }) {
+const FIRST_PLAY_CUE_KEY = 'galageaux:firstPlayCueSeen';
+
+export default function GameScreen({ onExit, showTutorial = false, showFirstPlayCue = false }) {
   const { width, height } = useWindowDimensions();
   const sessionRef = useRef(null);
   if (!sessionRef.current) sessionRef.current = createGameSession(width, height, showTutorial);
@@ -39,8 +42,12 @@ export default function GameScreen({ onExit, showTutorial = false }) {
   const [hudHeight, setHudHeight] = useState(58);
   const [tiltControlEnabled, setTiltControlEnabled] = useState(true);
   const [achievementToast, setAchievementToast] = useState(null);
+  const [controlCueVisible, setControlCueVisible] = useState(false);
+  const pendingToasts = useRef([]);
+  const activeToast = useRef(null);
   const mounted = useRef(false);
   const achievementQueue = useRef(Promise.resolve());
+  const exiting = useRef(false);
   const startedSession = useRef(null);
   const lastTimeRef = useRef(null);
   const fireHeldRef = useRef(false);
@@ -63,10 +70,18 @@ export default function GameScreen({ onExit, showTutorial = false }) {
   const stageComplete = phase === 'transition' || phase === 'won';
   const levelTarget = getLevelTarget(level);
   const controlsStopped = !isGameplayActive(snapshot);
-  const dismissAchievement = () => {
-    if (mounted.current && sessionRef.current.sessionId === snapshot.sessionId) {
-      setAchievementToast(current => current === achievementToast ? null : current);
-    }
+  const showNextToast = () => {
+    if (!mounted.current || activeToast.current || !pendingToasts.current.length) return;
+    const next = pendingToasts.current.shift();
+    activeToast.current = next;
+    setAchievementToast(next);
+    AudioManager.playSound('powerupCollect', 0.8);
+  };
+  const dismissAchievement = (toast, sessionId) => {
+    if (!mounted.current || sessionRef.current.sessionId !== sessionId || activeToast.current !== toast) return;
+    activeToast.current = null;
+    setAchievementToast(null);
+    showNextToast();
   };
 
   // Consume events after commit, never inside a React state updater/effect replay.
@@ -80,8 +95,8 @@ export default function GameScreen({ onExit, showTutorial = false }) {
       .then(() => AchievementManager.checkAchievements(updates))
       .then(unlocked => {
         if (mounted.current && sessionRef.current.sessionId === sessionId && unlocked?.length) {
-          setAchievementToast(unlocked[0]);
-          AudioManager.playSound('powerupCollect', 0.8);
+          pendingToasts.current.push(...unlocked);
+          showNextToast();
         }
       }).catch(error => console.warn('Achievement update failed:', error));
   };
@@ -134,6 +149,8 @@ export default function GameScreen({ onExit, showTutorial = false }) {
     });
     return () => {
       mounted.current = false;
+      pendingToasts.current = [];
+      activeToast.current = null;
       fireHeldRef.current = false;
       cancelAnimationFrame(id);
       subscription.remove();
@@ -155,18 +172,41 @@ export default function GameScreen({ onExit, showTutorial = false }) {
   }, [loaded]);
   useEffect(() => { AudioManager.setMusicTempo(level); }, [level]);
   useEffect(() => {
+    if (!showFirstPlayCue || showTutorial) return;
+    let cancelled = false;
+    AsyncStorage.getItem(FIRST_PLAY_CUE_KEY).then(seen => {
+      if (cancelled || seen === '1' || !isGameplayActive(sessionRef.current)) return;
+      setControlCueVisible(true);
+      Promise.resolve(AsyncStorage.setItem(FIRST_PLAY_CUE_KEY, '1')).catch(error =>
+        console.warn('Could not save first-play cue state:', error));
+    }).catch(error => {
+      console.warn('Could not read first-play cue state:', error);
+      if (!cancelled) setControlCueVisible(true);
+    });
+    return () => { cancelled = true; };
+  }, [showFirstPlayCue, showTutorial]);
+  useEffect(() => {
+    if (!controlCueVisible) return;
+    const timer = setTimeout(() => setControlCueVisible(false), 3800);
+    return () => clearTimeout(timer);
+  }, [controlCueVisible]);
+  useEffect(() => {
     if (!achievementToast) return;
-    const timer = setTimeout(dismissAchievement, 4000);
+    const toast = achievementToast;
+    const sessionId = snapshot.sessionId;
+    const timer = setTimeout(() => dismissAchievement(toast, sessionId), 4000);
     return () => clearTimeout(timer);
   }, [achievementToast, snapshot.sessionId]);
 
   const resetGame = () => {
     const fresh = createGameSession(width, height, false, sessionRef.current.sessionId + 1);
+    exiting.current = false;
     presentationRef.current = createPresentationState(fresh);
     fireHeldRef.current = false;
     sessionRef.current = fresh; setSnapshot(fresh);
     startedSession.current = fresh.sessionId;
-    setAchievementToast(null); resetStars(); lastTimeRef.current = null;
+    pendingToasts.current = []; activeToast.current = null;
+    setAchievementToast(null); setControlCueVisible(false); resetStars(); lastTimeRef.current = null;
     consumeEvents([{ type: 'gameStarted' }, { type: 'music', track: 'gameplay' }], fresh);
   };
   const handlePauseToggle = () => {
@@ -175,7 +215,19 @@ export default function GameScreen({ onExit, showTutorial = false }) {
     command({ type: sessionRef.current.phase === 'paused' ? 'resume' : 'pause' });
   };
   const handleResume = () => { fireHeldRef.current = false; lastTimeRef.current = null; command({ type: 'resume' }); };
-  const handleExitToMenu = () => { fireHeldRef.current = false; command({ type: 'pause' }); onExit(); };
+  const handleExitToMenu = async () => {
+    if (exiting.current) return;
+    exiting.current = true;
+    const sessionId = sessionRef.current.sessionId;
+    fireHeldRef.current = false;
+    command({ type: 'pause' });
+    // Let committed event deltas finish before a freshly opened Stats/gallery route reads them.
+    try { await achievementQueue.current; }
+    finally {
+      if (sessionRef.current.sessionId === sessionId) onExit();
+      else exiting.current = false;
+    }
+  };
   const handleGuideDismiss = () => { fireHeldRef.current = false; lastTimeRef.current = null; command({ type: 'start' }); };
   const handleAutoToggle = () => command({ type: 'toggleAutoFire' });
   const fireWeapon = () => command({ type: 'fire' });
@@ -283,8 +335,13 @@ export default function GameScreen({ onExit, showTutorial = false }) {
           }
         }}
         onPauseToggle={handlePauseToggle}
-        onExit={handleExitToMenu}
       />
+
+      {controlCueVisible && isGameplayActive(snapshot) && <View pointerEvents="none"
+        style={[styles.controlCue, { top: hudTop + hudHeight + 10, maxWidth: width - 24 }]}>
+        <Text style={styles.controlCuePrimary}>TILT TO MOVE · HOLD FIRE TO SHOOT</Text>
+        <Text style={styles.controlCueSecondary}>For touch: PAUSE → Tilt Control Off</Text>
+      </View>}
 
       <FireButton
         position={fireButtonPosition}
@@ -323,23 +380,25 @@ export default function GameScreen({ onExit, showTutorial = false }) {
       <ControlHintsOverlay 
         visible={showGuide && !gameOver} 
         onDismiss={handleGuideDismiss}
-        onBack={showTutorial ? onExit : null}
+        onBack={showTutorial ? handleExitToMenu : null}
       />
 
       <StageCompleteOverlay 
         visible={stageComplete && !gameOver} 
         currentStage={currentStage} 
         allStages={STAGES}
+        score={score}
         onRetry={resetGame}
         onExit={handleExitToMenu}
       />
 
       {gameOver && (
-        <GameOverOverlay score={score} onRetry={resetGame} onExit={onExit} />
+        <GameOverOverlay score={score} onRetry={resetGame} onExit={handleExitToMenu} />
       )}
       
       {achievementToast && (
-        <AchievementToast achievement={achievementToast} visible={true} onDismiss={dismissAchievement} />
+        <AchievementToast achievement={achievementToast} visible={true}
+          onDismiss={() => dismissAchievement(achievementToast, snapshot.sessionId)} />
       )}
     </View>
   );
@@ -348,6 +407,13 @@ export default function GameScreen({ onExit, showTutorial = false }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'black' },
   canvas: { flex: 1 },
+  controlCue: { position: 'absolute', alignSelf: 'center', paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 10, borderWidth: 1, borderColor: 'rgba(88,202,250,0.55)',
+    backgroundColor: 'rgba(2,8,23,0.82)', alignItems: 'center' },
+  controlCuePrimary: { color: '#e8f4ff', fontSize: 11, fontWeight: '900', letterSpacing: 0.3,
+    textAlign: 'center' },
+  controlCueSecondary: { color: '#79d7ff', fontSize: 10, fontWeight: '700', marginTop: 3,
+    textAlign: 'center' },
   bossStatus: { position: 'absolute', flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between', gap: 6, minHeight: 18, paddingHorizontal: 3,
     backgroundColor: 'rgba(2, 6, 23, 0.75)' },

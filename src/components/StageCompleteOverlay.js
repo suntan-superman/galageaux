@@ -12,7 +12,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
  * @property {string[]} allStages - Array of all stage identifiers
  */
 
-export default function StageCompleteOverlay({ visible, currentStage, allStages, onRetry, onExit }) {
+export default function StageCompleteOverlay({ visible, currentStage, allStages, score = 0, onRetry, onExit }) {
   if (!visible) return null;
 
   const currentIndex = allStages.indexOf(currentStage);
@@ -22,15 +22,17 @@ export default function StageCompleteOverlay({ visible, currentStage, allStages,
   return (
     <View style={styles.overlay}>
       <View style={styles.card}>
-        <Text style={styles.title}>STAGE COMPLETE!</Text>
-        <Text style={styles.stage}>{currentStage.toUpperCase()}</Text>
+        <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit>STAGE COMPLETE!</Text>
+        <Text style={styles.stage} numberOfLines={1} adjustsFontSizeToFit>{currentStage.toUpperCase()}</Text>
         {nextStage ? (
           <Text style={styles.next}>
             Get ready for {nextStage.toUpperCase()}...
           </Text>
         ) : (
           <>
-            <Text style={styles.victory}>🎉 YOU WIN! 🎉</Text>
+            <Text style={styles.victory}>YOU WIN</Text>
+            <Text style={styles.scoreLabel}>FINAL SCORE</Text>
+            <Text style={styles.scoreValue} numberOfLines={1} adjustsFontSizeToFit>{score.toLocaleString('en-US')}</Text>
             <TouchableOpacity accessibilityRole="button" onPress={onRetry} style={styles.action}>
               <Text style={styles.next}>PLAY AGAIN</Text>
             </TouchableOpacity>
@@ -59,7 +61,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(30, 41, 59, 0.95)',
     borderRadius: 24,
     paddingVertical: 40,
-    paddingHorizontal: 60,
+    paddingHorizontal: 24,
+    width: '90%',
+    maxWidth: 360,
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#38bdf8',
@@ -98,5 +102,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 2
   },
+  scoreLabel: { color: '#94a3b8', fontSize: 14, fontWeight: '800', letterSpacing: 2, marginTop: 14 },
+  scoreValue: { color: '#f8fafc', fontSize: 32, fontWeight: '900', marginTop: 4 },
   action: { padding: 12, marginTop: 8 }
 });

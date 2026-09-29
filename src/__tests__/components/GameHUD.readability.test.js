@@ -12,7 +12,7 @@ const values = element => nodes(element).filter(node => node.type === 'Text')
   .map(node => React.Children.toArray(node.props.children).join(''));
 const base = { score: 1787, currentStage: 'stage1', level: 3, levelKills: 0,
   levelTarget: 8, lives: 2, hasShield: false, isPaused: false,
-  onPauseToggle: jest.fn(), onExit: jest.fn() };
+  onPauseToggle: jest.fn() };
 
 describe('compact gameplay HUD', () => {
   it('calls the ordinary-enemy counter enemies and keeps controls in a fitted, measured top strip', () => {
@@ -20,13 +20,14 @@ describe('compact gameplay HUD', () => {
     const tree = GameHUD({ ...base, top: 67, onLayout });
     expect(values(tree)).toEqual(expect.arrayContaining([
       'SCORE', '1,787', 'STAGE', '1', 'LIVES', '♥ 2', 'PAUSE',
-      'Level 03 · 0/8 enemies', 'NO SHIELD', 'Exit',
+      'Level 03 · 0/8 enemies', 'NO SHIELD',
     ]));
     const hud = nodes(tree).find(node => node.type === 'View' && node.props.onLayout === onLayout);
     expect(hud.props.style[1].top).toBe(67);
     expect(hud.props.style[0]).toMatchObject({ left: 12, right: 12 });
-    expect(nodes(tree).filter(node => node.type === 'Text' && node.props.children !== 'Exit')
+    expect(nodes(tree).filter(node => node.type === 'Text')
       .every(node => node.props.numberOfLines === 1 && node.props.adjustsFontSizeToFit)).toBe(true);
+    expect(nodes(tree).find(node => node.props.accessibilityLabel === 'Exit game')).toBeUndefined();
     expect(nodes(tree).find(node => node.props.accessibilityLabel === 'Pause game').props.onPress)
       .toBe(base.onPauseToggle);
   });

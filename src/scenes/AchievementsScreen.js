@@ -10,14 +10,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Animated,
-  Dimensions
+  Animated
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ACHIEVEMENTS, loadAchievements, getUnlockedAchievements, getStats } from '../engine/achievements';
-import LiquidGlassCard from '../components/LiquidGlassCard';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Achievement category groupings
 const CATEGORIES = {
@@ -53,7 +49,7 @@ const CATEGORIES = {
   }
 };
 
-function AchievementCard({ achievement, isUnlocked, progress, isNew }) {
+function AchievementCard({ achievement, isUnlocked, progress }) {
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
 
@@ -115,11 +111,6 @@ function AchievementCard({ achievement, isUnlocked, progress, isNew }) {
           ]}>
             {achievement.title}
           </Text>
-          {isNew && (
-            <View style={styles.newBadge}>
-              <Text style={styles.newBadgeText}>NEW!</Text>
-            </View>
-          )}
         </View>
         
         <Text style={[
@@ -148,7 +139,7 @@ function AchievementCard({ achievement, isUnlocked, progress, isNew }) {
   );
 }
 
-function CategorySection({ category, categoryKey, unlockedSet, stats, newAchievements }) {
+function CategorySection({ category, unlockedSet, stats }) {
   const achievements = category.achievements.map(id => ACHIEVEMENTS[id]).filter(Boolean);
   
   const unlockedCount = achievements.filter(a => unlockedSet.has(a.id)).length;
@@ -180,7 +171,7 @@ function CategorySection({ category, categoryKey, unlockedSet, stats, newAchieve
         current = stats.maxLevel || 0;
         break;
       case 'stageComplete':
-        current = (stats.stagesCompleted || []).length;
+        current = (stats.stagesCompleted || []).includes(value) ? value : 0;
         break;
       default:
         current = 0;
@@ -208,7 +199,6 @@ function CategorySection({ category, categoryKey, unlockedSet, stats, newAchieve
             achievement={achievement}
             isUnlocked={unlockedSet.has(achievement.id)}
             progress={getProgress(achievement)}
-            isNew={newAchievements.has(achievement.id)}
           />
         ))}
       </View>
@@ -219,7 +209,6 @@ function CategorySection({ category, categoryKey, unlockedSet, stats, newAchieve
 export default function AchievementsScreen({ onBack }) {
   const [unlocked, setUnlocked] = useState(new Set());
   const [stats, setStats] = useState({});
-  const [newAchievements] = useState(new Set()); // Could track recently unlocked
   const [loading, setLoading] = useState(true);
 
   const totalAchievements = Object.keys(ACHIEVEMENTS).length;
@@ -230,7 +219,7 @@ export default function AchievementsScreen({ onBack }) {
     async function load() {
       await loadAchievements();
       const unlockedList = getUnlockedAchievements();
-      setUnlocked(new Set(unlockedList.map(a => a.id)));
+      setUnlocked(new Set(unlockedList));
       setStats(getStats());
       setLoading(false);
     }
@@ -278,11 +267,9 @@ export default function AchievementsScreen({ onBack }) {
         {Object.entries(CATEGORIES).map(([key, category]) => (
           <CategorySection
             key={key}
-            categoryKey={key}
             category={category}
             unlockedSet={unlocked}
             stats={stats}
-            newAchievements={newAchievements}
           />
         ))}
         
@@ -481,18 +468,6 @@ const styles = StyleSheet.create({
   },
   textLocked: {
     opacity: 0.6,
-  },
-  newBadge: {
-    backgroundColor: '#f59e0b',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginLeft: 8,
-  },
-  newBadgeText: {
-    color: '#000',
-    fontSize: 10,
-    fontWeight: '800',
   },
   progressContainer: {
     flexDirection: 'row',

@@ -21,14 +21,13 @@ jest.mock('../../engine/audio', () => ({
 }));
 jest.mock('../../scenes/GameScreen', () => 'GameScreen');
 jest.mock('../../scenes/ShowMeDemo', () => 'ShowMeDemo');
-jest.mock('../../scenes/AuthScreen', () => 'AuthScreen');
 jest.mock('../../scenes/AchievementsScreen', () => 'AchievementsScreen');
 jest.mock('../../scenes/SettingsScreen', () => 'SettingsScreen');
 jest.mock('../../scenes/StatsScreen', () => 'StatsScreen');
 jest.mock('../../components/AudioStatusBadge', () => 'AudioStatusBadge');
 
 const flatten = style => Object.assign({}, ...[style].flat(Infinity).filter(Boolean));
-const labels = ['PLAY', 'SHOW ME HOW', 'ACHIEVEMENTS', 'SETTINGS', 'STATS', 'ACCOUNT'];
+const labels = ['PLAY', 'SHOW ME HOW', 'ACHIEVEMENTS', 'SETTINGS', 'STATS'];
 let renderer;
 const mount = async () => { await act(async () => { renderer = create(<MainMenu />); }); };
 const press = async index => { await act(async () => renderer.root.findAllByType('TouchableOpacity')[index].props.onPress()); };
@@ -107,13 +106,26 @@ it('requests menu music again on return without rereading or rewriting restored 
 
 it('routes SHOW ME HOW to a replayable demo without starting a campaign until Play Now', async () => {
   await mount(); await press(1);
+  expect(AsyncStorage.setItem).toHaveBeenCalledWith('galageaux:firstPlayCueSeen', '1');
   expect(renderer.root.findAllByType('GameScreen')).toHaveLength(0);
   const demo = renderer.root.findByType('ShowMeDemo');
   await act(async () => demo.props.onBack());
   expect(renderer.root.findAllByType('ShowMeDemo')).toHaveLength(0);
+  await press(0);
+  expect(renderer.root.findByType('GameScreen').props.showFirstPlayCue).toBe(false);
+  await act(async () => renderer.root.findByType('GameScreen').props.onExit());
   await press(1);
   await act(async () => renderer.root.findByType('ShowMeDemo').props.onPlay());
   expect(renderer.root.findAllByType('GameScreen')).toHaveLength(1);
+  expect(renderer.root.findByType('GameScreen').props.showFirstPlayCue).toBe(false);
+});
+
+it('keeps Account hidden and requests a first-play cue only for direct PLAY', async () => {
+  await mount();
+  expect(renderer.root.findAllByType('TouchableOpacity').map(button => button.props.accessibilityLabel))
+    .not.toContain('ACCOUNT');
+  await press(0);
+  expect(renderer.root.findByType('GameScreen').props.showFirstPlayCue).toBe(true);
 });
 
 it('waits for the same pending initialization when returning rapidly to the menu', async () => {
