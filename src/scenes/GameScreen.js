@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AppState, View, StyleSheet, useWindowDimensions } from 'react-native';
+import { AppState, View, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import { Canvas, Group } from '@shopify/react-native-skia';
+import { initialWindowMetrics } from 'react-native-safe-area-context';
 import { createGameSession, commandGameSession, stepGameSession, isGameplayActive, MAX_FRAME_SECONDS } from '../engine/gameSimulation';
 import { getAchievementUpdates, playGameEventSounds } from '../engine/gameEventEffects';
 import { getLevelTarget } from '../engine/difficulty';
@@ -17,6 +18,9 @@ import BonusBanner from '../components/BonusBanner';
 import StageCompleteOverlay from '../components/StageCompleteOverlay';
 import HitFlash from '../components/HitFlash';
 import BossHealthBar from '../components/BossHealthBar';
+import BossAnnouncement from '../components/BossAnnouncement';
+import bossConfig from '../config/boss.json';
+import { BOSS_IDENTITY, BOSS_STATE } from '../engine/bossEncounter';
 import { createPresentationState, advancePresentation, getWorldOffset, getDamageFlash, getHitFlashes } from '../engine/presentation';
 import { Background, StarField, PlayerShip, Enemies, BossShip, PlayerBullets, EnemyBullets, MuzzleFlashes, Explosions, Particles, Powerups } from '../components/canvas';
 import GameOverOverlay from './GameOverOverlay';
@@ -101,7 +105,7 @@ export default function GameScreen({ onExit, showTutorial = false }) {
       const playerX = updateTilt(dt, state.player.x);
       commit(stepGameSession({ ...state, width, height }, dt, { playerX }), dt);
       updateStars(dt);
-    } else if (state.phase === 'transition') {
+    } else if (state.phase === 'transition' || state.phase === 'bossDeath') {
       commit(stepGameSession(state, dt), dt);
     }
   };
@@ -178,6 +182,11 @@ export default function GameScreen({ onExit, showTutorial = false }) {
   const damageFlash = getDamageFlash(playerHitFlash);
   const hudScale = 1 + hudPulse * 0.08;
   const fireButtonDisabled = !canFire || controlsStopped;
+  const bossBarY = Math.max(130, (initialWindowMetrics?.insets.top || 0) + 88);
+  const bossBarVisible = boss?.alive && ![BOSS_STATE.ANNOUNCING, BOSS_STATE.ENTERING].includes(boss.encounterState);
+  const bossIdentity = BOSS_IDENTITY[currentStage];
+  const phasePulse = boss?.encounterState === BOSS_STATE.PHASE_TRANSITION
+    ? Math.sin(Math.PI * Math.min(1, boss.stateElapsed / bossIdentity.phaseChange)) : 0;
 
   return (
     <View style={styles.container} {...panHandlers}>
@@ -202,7 +211,7 @@ export default function GameScreen({ onExit, showTutorial = false }) {
         )}
 
         <Enemies enemies={enemies} ox={0} oy={0} hitFlashes={hitFlashes.enemy} />
-        <BossShip boss={boss} ox={0} oy={0} screenWidth={width} hitFlash={hitFlashes.boss} showHealthBar={false} />
+        <BossShip boss={boss} stage={currentStage} ox={0} oy={0} screenWidth={width} hitFlash={hitFlashes.boss} showHealthBar={false} />
         <Explosions explosions={explosions} ox={0} oy={0} />
         <Particles particles={particles} ox={0} oy={0} />
         <Powerups powerups={powerups} ox={0} oy={0} time={presentation.time} />
@@ -211,9 +220,16 @@ export default function GameScreen({ onExit, showTutorial = false }) {
         {/* Threat cores stay above transient effects so patterns remain legible. */}
         <EnemyBullets bullets={enemyBullets} ox={0} oy={0} />
         </Group>
-        {boss?.alive && <BossHealthBar health={boss.hp} maxHealth={boss.maxHp}
-          trailingHealth={presentation.bossHealth} x={width / 2 - 100} y={112} width={200} height={10} />}
+        {bossBarVisible && <BossHealthBar health={boss.hp} maxHealth={boss.maxHp}
+          trailingHealth={presentation.bossHealth} x={width / 2 - 100} y={bossBarY} width={200} height={10}
+          accent={bossIdentity.phaseColors[Math.min(boss.phaseIndex || 0, bossIdentity.phaseColors.length - 1)]} phasePulse={phasePulse}
+          phaseThresholds={bossConfig[currentStage].phases.map(phase => phase.hpThreshold)} />}
       </Canvas>
+
+      <BossAnnouncement boss={boss} stage={currentStage} top={bossBarY + 15} />
+      {bossBarVisible && <View pointerEvents="none" style={[styles.bossName, { top: bossBarY - 19 }]}>
+        <Text style={[styles.bossNameText, { color: bossIdentity.color }]}>{bossIdentity.name}</Text>
+      </View>}
 
       <HitFlash intensity={damageFlash} />
       <LevelBanner text={levelBanner} visible={!inBonusRound} />
@@ -238,7 +254,7 @@ export default function GameScreen({ onExit, showTutorial = false }) {
         disabled={fireButtonDisabled}
         autoFire={autoFire}
         onFire={fireWeapon}
-        visible={player.alive && !gameOver && phase !== 'won'}
+        visible={player.alive && !gameOver && phase !== 'won' && phase !== 'bossDeath'}
       />
 
       <ScorePopup items={scoreTexts} offsetX={ox} offsetY={oy} />
@@ -292,5 +308,7 @@ export default function GameScreen({ onExit, showTutorial = false }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'black' },
-  canvas: { flex: 1 }
+  canvas: { flex: 1 },
+  bossName: { position: 'absolute', left: 90, right: 90, alignItems: 'center' },
+  bossNameText: { fontSize: 11, fontWeight: '800', letterSpacing: 1.4 },
 });

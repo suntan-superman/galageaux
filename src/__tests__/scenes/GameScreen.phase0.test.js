@@ -6,13 +6,15 @@ import * as Simulation from '../../engine/gameSimulation';
 import { AppState } from 'react-native';
 import { createEnemy } from '../../engine/spawner';
 import { calculateDifficultySettings } from '../../engine/difficulty';
+import { createBossEncounter, BOSS_STATE } from '../../engine/bossEncounter';
 import waves from '../../config/waves.json';
 
 jest.mock('react-native', () => ({
-  View: 'View', StyleSheet: { create: styles => styles },
+  View: 'View', Text: 'Text', StyleSheet: { create: styles => styles },
   useWindowDimensions: () => ({ width: 400, height: 800 }),
   AppState: { currentState: 'active', addEventListener: jest.fn(() => ({ remove: jest.fn() })) },
 }));
+jest.mock('react-native-safe-area-context', () => ({ initialWindowMetrics: { insets: { top: 59 } } }));
 jest.mock('@react-native-async-storage/async-storage', () => ({ getItem: jest.fn(async () => null), setItem: jest.fn(async () => {}) }));
 jest.mock('@shopify/react-native-skia', () => ({ Canvas: 'Canvas', Group: 'Group' }));
 jest.mock('../../components/BossHealthBar', () => 'BossHealthBar');
@@ -244,9 +246,39 @@ describe('mounted production GameScreen frame contract', () => {
     }
     expect(props('ScorePopup')).toMatchObject({ offsetX: 4.5, offsetY: -2.7 });
     expect(screen.root.findByType('BossHealthBar').parent.type).toBe('Canvas');
-    expect(props('BossHealthBar')).toMatchObject({ x: 100, y: 112, health: 80 });
+    expect(props('BossHealthBar')).toMatchObject({ x: 100, y: 147, health: 80 });
     expect(screen.root.findByType('Background').parent.type).toBe('Canvas');
     const world = screen.root.findByType('Group');
     expect(world.children[world.children.length - 1].type).toBe('EnemyBullets');
+  });
+  it('Phase 3: reveals the safe-area bar only after the protected boss entrance', async () => {
+    const seed = Simulation.createGameSession(400, 800);
+    seed.phase = 'boss'; seed.bossSpawned = true; seed.initialWaveSpawned = true;
+    seed.boss = createBossEncounter('stage1', 400, 800);
+    jest.spyOn(Simulation, 'createGameSession').mockReturnValueOnce(seed);
+    await mount(false);
+    expect(screen.root.findAllByType('BossHealthBar')).toHaveLength(0);
+    await advance(3.2);
+    expect(props('BossShip').boss.encounterState).toBe(BOSS_STATE.READY);
+    expect(props('BossHealthBar')).toMatchObject({ health: 100, y: 147 });
+    expect(screen.root.findAllByType('StageCompleteOverlay')[0].props.visible).toBe(false);
+  });
+  it('Phase 3: hides health at zero HP and delays Stage Complete until destruction ends', async () => {
+    const seed = Simulation.createGameSession(400, 800);
+    seed.phase = 'boss'; seed.bossSpawned = true; seed.initialWaveSpawned = true;
+    seed.boss = { ...createBossEncounter('stage1', 400, 800), y: 178, hp: 1,
+      encounterState: BOSS_STATE.READY };
+    seed.bullets = [{ id: '1:contact', x: seed.boss.x + 8, y: 186,
+      width: 4, height: 14, vx: 0, vy: 0 }];
+    jest.spyOn(Simulation, 'createGameSession').mockReturnValueOnce(seed);
+    await mount(false);
+    expect(props('BossHealthBar').health).toBe(1);
+    await frame(16); await frame(16);
+    expect(props('BossShip').boss.encounterState).toBe(BOSS_STATE.DYING);
+    expect(screen.root.findAllByType('BossHealthBar')).toHaveLength(0);
+    expect(props('StageCompleteOverlay').visible).toBe(false);
+    await advance(1.4);
+    expect(props('StageCompleteOverlay').visible).toBe(true);
+    expect(screen.root.findAllByType('BossHealthBar')).toHaveLength(0);
   });
 });

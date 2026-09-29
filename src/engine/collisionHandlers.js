@@ -185,24 +185,14 @@ export function checkBulletBossCollisions(bullets, boss, screenshake) {
     if (nextHp <= 0) {
       const bossCenterX = boss.x + boss.width / 2;
       const bossCenterY = boss.y + boss.height / 2;
-      
-      if (screenshake) {
-        triggerScreenshake(screenshake, 14, 0.6);
-      }
-      
-      explosions.push(spawnExplosion(bossCenterX, bossCenterY, 80, 0.6, '#a855f7'));
-      particles.push(
-        ...spawnExplosionParticles(bossCenterX, bossCenterY, 50, 'boss'),
-        ...spawnExplosionParticles(bossCenterX, bossCenterY, 30, 'debris')
-      );
-      
+      // The authoritative session stages the visible death after this contact.
+      // Scoring and exactly-once defeat still resolve at the actual zero-HP hit.
       scoreTexts.push({
         x: bossCenterX,
         y: bossCenterY,
         text: '+1000',
         color: '#fbbf24',
         life: 1.5,
-        id: Date.now() + Math.random(),
         isBoss: true
       });
       

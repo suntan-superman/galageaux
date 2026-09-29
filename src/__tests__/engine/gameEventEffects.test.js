@@ -89,8 +89,15 @@ describe('production game event achievement adapter', () => {
     state.bullets = [{ x: state.boss.x, y: 101, width: 4, height: 14, vx: 0, vy: 0 }];
     const result = stepGameSession(state, 1 / 60, undefined, () => 0.65);
     const unlocked = await achievements.checkAchievements(getAchievementUpdates(result.events, result.state));
-    const later = stepGameSession(result.state, 1 / 60, undefined, () => 0.65);
-    expect(getAchievementUpdates(later.events, later.state)).toEqual({});
+    let later = result, terminalEvents = [];
+    for (let frame = 0; frame < 90; frame++) {
+      later = stepGameSession(later.state, 1 / 60, undefined, () => 0.65);
+      terminalEvents.push(...later.events);
+    }
+    expect(later.state.phase).toBe('won');
+    expect(terminalEvents.filter(event => event.type === 'sessionEnded')).toHaveLength(1);
+    await achievements.checkAchievements(getAchievementUpdates(terminalEvents, later.state));
+    expect(getAchievementUpdates(stepGameSession(later.state, 1 / 60).events, later.state)).toEqual({});
     expect(achievements.getStats()).toMatchObject({ totalBosses: 1, stagesCompleted: [3], totalScore: result.state.score });
     expect(unlocked.map(item => item.id)).toEqual(['bossSlayer', 'acePilot']);
   });

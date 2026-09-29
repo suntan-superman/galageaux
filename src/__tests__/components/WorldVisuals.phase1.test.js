@@ -8,6 +8,7 @@ import { PALETTE, PRESENTATION } from '../../constants/visualTheme';
 jest.mock('@shopify/react-native-skia', () => ({
   Group: 'Group', Circle: 'Circle', Rect: 'Rect', Path: 'Path',
   LinearGradient: 'LinearGradient', RadialGradient: 'RadialGradient', vec: (x, y) => ({ x, y }),
+  Skia: { Path: { MakeFromSVGString: path => path } },
 }));
 jest.mock('react-native', () => ({ View: 'View', StyleSheet: { create: x => x } }));
 const flatten = element => !React.isValidElement(element) ? [] : [element, ...React.Children.toArray(element.props.children).flatMap(flatten)];
@@ -38,14 +39,15 @@ describe('Phase 1 world materials and overlay contracts', () => {
     expect(flatten(outer).some(node => node.type === 'Path' && node.props.style === 'stroke' && node.props.opacity === 0.325)).toBe(true);
     expect(enemy).toMatchObject({ x: 40, y: 80 });
   });
-  it('preserves boss silhouette and positions while adding a bounded local contact flash', () => {
+  it('draws the new boss silhouette inside the preserved AABB with a bounded local contact flash', () => {
     const boss = Object.freeze({ x: 100, y: 90, width: 80, height: 60, hp: 60, maxHp: 100, alive: true });
     const nodes = flatten(BossShip({ boss, hitFlash: 0.5, showHealthBar: false }));
-    const body = nodes.find(node => node.type === 'Rect' && node.props.x === 100 && node.props.y === 90);
-    expect(body.props).toMatchObject({ width: 80, height: 60 });
-    expect(nodes.find(node => node.type === 'Rect' && node.props.color === PALETTE.core).props.opacity).toBe(0.375);
+    const body = nodes.find(node => node.type === 'Group' && node.props.transform?.[0]?.translateX === 100);
+    expect(body.props.transform).toEqual([{ translateX: 100 }, { translateY: 90 }]);
+    expect(nodes.some(node => node.type === 'Path' && String(node.props.path).startsWith('M 4 18'))).toBe(true);
+    expect(nodes.find(node => node.type === 'Path' && node.props.color === PALETTE.core).props.opacity).toBe(0.25);
     expect(nodes.some(node => node.type === BossHealthBar)).toBe(false);
-    expect(boss.hp).toBe(60);
+    expect(boss).toMatchObject({ hp: 60, width: 80, height: 60, x: 100, y: 90 });
   });
   it('draws true boss health immediately with a separate non-authoritative trailing band', () => {
     const nodes = flatten(BossHealthBar({ health: 25, maxHealth: 100, trailingHealth: 50, x: 10, y: 112, width: 200, height: 10 }));

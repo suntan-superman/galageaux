@@ -131,18 +131,20 @@ describe('authoritative production simulation', () => {
     expect(fresh.level).toBe(1); expect(fresh.bonusTimeLeft).toBe(0);
     expect(fresh.muzzleFlashes).toEqual([]); expect(fresh.screenOffset).toEqual({ ox: 0, oy: 0 });
   });
-  it('boss cooldown advances only once in the live frame pipeline', () => {
+  it('advances the announcement clock once without touching the legacy cooldown or source snapshot', () => {
     const state = { ...session(), boss: createBoss('stage1', 400), phase: 'boss' };
     const result = tick(state, 0.1);
-    expect(result.state.boss.fireCooldown).toBeCloseTo(1.1, 8);
+    expect(result.state.boss.encounterState).toBe('ANNOUNCING');
+    expect(result.state.boss.stateElapsed).toBeCloseTo(0.1, 8);
+    expect(result.state.boss.fireCooldown).toBe(1.2);
     expect(state.boss.fireCooldown).toBe(1.2);
   });
-  it('preserves firing during boss entrance as explicit existing policy', () => {
+  it('protects the new boss announcement/entrance from old immediate entry volleys', () => {
     const boss = { ...createBoss('stage1', 400), fireCooldown: 0.01 };
     const result = tick({ ...session(), boss, phase: 'boss' });
     expect(result.state.boss.y).toBeLessThan(0);
-    expect(result.state.enemyBullets.length).toBeGreaterThan(0);
-    expect(result.events.filter(e => e.type === 'bossFired')).toHaveLength(1);
+    expect(result.state.enemyBullets).toHaveLength(0);
+    expect(result.events.filter(e => e.type === 'bossFired')).toHaveLength(0);
   });
   it('stage transition blocks hazards then requests the valid gameplay track', () => {
     const state = session();
@@ -150,11 +152,11 @@ describe('authoritative production simulation', () => {
     state.bullets = [bullet(state.boss.x, 101)];
     state.enemyBullets = [bullet(state.player.x, state.player.y)];
     const result = tick(state);
-    expect(result.state.phase).toBe('transition');
+    expect(result.state.phase).toBe('bossDeath');
     expect(result.state.player.lives).toBe(5);
     expect(result.events.filter(e => e.type === 'bossKilled')).toHaveLength(1);
     let next = result.state, events = [];
-    for (let i = 0; i < 120; i++) { const r = tick(next); next = r.state; events.push(...r.events); }
+    for (let i = 0; i < 210; i++) { const r = tick(next); next = r.state; events.push(...r.events); }
     expect(next.currentStage).toBe('stage2');
     expect(events).toContainEqual(expect.objectContaining({ type: 'music', track: 'gameplay' }));
   });
@@ -163,8 +165,10 @@ describe('authoritative production simulation', () => {
     state.boss = { ...createBoss(state.currentStage, 400), y: 100, hp: 1 };
     state.bullets = [bullet(state.boss.x, 101)];
     const result = tick(state);
-    expect(result.state.phase).toBe('won');
-    expect(tick(result.state, 100)).toEqual({ state: result.state, events: [] });
+    expect(result.state.phase).toBe('bossDeath');
+    const after = advance(result.state, 1.5);
+    expect(after.phase).toBe('won');
+    expect(tick(after, 100)).toEqual({ state: after, events: [] });
   });
   it('clamps a long frame to 100ms with bounded substeps', () => {
     const state = { ...session(), enemies: [enemy()] };

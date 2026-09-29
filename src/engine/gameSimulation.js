@@ -8,8 +8,8 @@ import { PLAYER_WIDTH, PLAYER_HEIGHT, BULLET_WIDTH, BULLET_HEIGHT } from '../ent
 import { spawnWave, createEnemyBullet } from './spawner';
 import { calculateDifficultySettings, calculateEnemyFireCooldown, getLevelTarget } from './difficulty';
 import { createPlayerBullets } from './projectiles';
-import { createBoss, updateBoss, bossCurrentPattern } from './boss';
 import { generateBossBullets } from './boss-patterns';
+import { BOSS_STATE, BOSS_IDENTITY, createBossEncounter, advanceBossEncounter, resolveBossPhase, beginBossDeath } from './bossEncounter';
 import { checkBulletEnemyCollisions, checkBulletBossCollisions, checkEnemyBulletPlayerCollisions, checkPowerupCollisions } from './collisionHandlers';
 import { createPowerup, updatePowerup, POWERUP_DURATION } from './powerups';
 import { spawnExplosion, spawnExplosionParticles, spawnShieldRipple, updateParticles, updateExplosion } from './particles';
@@ -72,7 +72,7 @@ function fire(state, events) {
 export function commandGameSession(snapshot, command) {
   const state = copySnapshot(snapshot), events = [];
   if (command.type === 'start' && state.phase === 'tutorial') state.phase = 'playing';
-  else if (command.type === 'pause' && (isGameplayActive(state) || state.phase === 'transition')) {
+  else if (command.type === 'pause' && (isGameplayActive(state) || state.phase === 'transition' || state.phase === 'bossDeath')) {
     state.resumePhase = state.phase; state.phase = 'paused';
   } else if (command.type === 'resume' && state.phase === 'paused') {
     state.phase = state.resumePhase || activePhase(state); state.resumePhase = null;
@@ -169,7 +169,45 @@ function mergeCollisionEffects(state, results) {
   state.score += results.scoreGain || 0;
 }
 
+function advanceBossDeath(state, dt, events) {
+  agePresentation(state, dt);
+  const boss = state.boss;
+  if (!boss || boss.encounterState !== BOSS_STATE.DYING) return;
+  const elapsed = boss.deathElapsed + dt;
+  const x = boss.x + boss.width / 2, y = boss.y + boss.height / 2;
+  const color = BOSS_IDENTITY[state.currentStage].color;
+  const cues = [0.1, 0.28, 0.52, 0.72];
+  let deathCueIndex = boss.deathCueIndex;
+  while (deathCueIndex < cues.length && elapsed + 1e-9 >= cues[deathCueIndex]) {
+    if (deathCueIndex === 0) state.explosions.push(spawnExplosion(x, y, 17, 0.3, color));
+    if (deathCueIndex === 1) {
+      state.explosions.push(spawnExplosion(boss.x + boss.width * 0.2, boss.y + boss.height * 0.65, 22, 0.35, color));
+      state.explosions.push(spawnExplosion(boss.x + boss.width * 0.8, boss.y + boss.height * 0.65, 22, 0.35, color));
+    }
+    if (deathCueIndex === 2) {
+      const final = state.currentStage === 'stage3';
+      state.explosions.push(spawnExplosion(x, y, final ? 90 : 76, 0.58, color));
+      state.particles.push(...spawnExplosionParticles(x, y, final ? 16 : 12, 'boss', color),
+        ...spawnExplosionParticles(x, y, final ? 10 : 8, 'debris'));
+      triggerScreenshake(state.shake, 14, 0.6);
+    }
+    if (deathCueIndex === 3) state.explosions.push(spawnExplosion(x, y, state.currentStage === 'stage3' ? 94 : 80, 0.45, color));
+    deathCueIndex++;
+  }
+  state.boss = { ...boss, deathElapsed: elapsed, stateElapsed: elapsed, deathCueIndex };
+  if (elapsed + 1e-9 >= (state.currentStage === 'stage3' ? 1.5 : 1.35)) {
+    state.boss = { ...state.boss, encounterState: BOSS_STATE.DEFEATED };
+    state.phase = state.currentStage === STAGES[STAGES.length - 1] ? 'won' : 'transition';
+    state.transitionTimeLeft = state.phase === 'transition' ? 2 : 0;
+    if (state.phase === 'won') {
+      emit(state, events, 'victory');
+      emit(state, events, 'sessionEnded', { outcome: 'won' });
+    }
+  }
+}
+
 function advance(state, dt, input, events, random) {
+  if (state.phase === 'bossDeath') { advanceBossDeath(state, dt, events); return; }
   if (state.phase === 'transition') {
     agePresentation(state, dt);
     state.transitionTimeLeft = remaining(state.transitionTimeLeft, dt);
@@ -226,18 +264,23 @@ function advance(state, dt, input, events, random) {
     if (!state.initialWaveSpawned || (state.enemySpawnTimer + 1e-9 >= difficulty.spawnInterval && state.enemies.length < difficulty.maxEnemies)) addWave(state, difficulty, stage, random);
     // Preserve the live spawn-quota arrival rule (not kill quota).
     if (state.totalEnemiesSpawned >= stage.maxEnemies) {
-      state.boss = createBoss(state.currentStage, state.width); state.bossSpawned = true;
-      triggerScreenshake(state.shake, 12, 0.4); emit(state, events, 'bossAppeared'); emit(state, events, 'music', { track: 'boss' });
+      state.boss = createBossEncounter(state.currentStage, state.width, state.height); state.bossSpawned = true;
+      // Protected breathing room: no ordinary hazard survives the quota crossing.
+      state.enemies = []; state.enemyBullets = [];
+      emit(state, events, 'music', { track: 'boss' });
     }
   }
+  let pendingBossVolley = null;
   if (state.boss?.alive) {
-    state.boss = updateBoss(state.boss, dt, state.currentStage); // sole cooldown owner
-    if (state.boss.fireCooldown <= 1e-9) {
-      const shots = generateBossBullets(state.boss, bossCurrentPattern(state.boss, state.currentStage), state.currentStage,
-        state.player.x + state.player.width / 2, state.player.y + state.player.height / 2);
-      state.enemyBullets.push(...shots.map(shot => identify(state, shot)));
-      state.boss.fireCooldown = 1.1; emit(state, events, 'bossFired');
+    const next = advanceBossEncounter(state.boss, dt, { stageKey: state.currentStage,
+      width: state.width, height: state.height, player: state.player });
+    state.boss = next.boss;
+    pendingBossVolley = next.volley;
+    if (next.appeared) {
+      triggerScreenshake(state.shake, 7, 0.25);
+      emit(state, events, 'bossAppeared');
     }
+    if ([BOSS_STATE.ANNOUNCING, BOSS_STATE.ENTERING, BOSS_STATE.READY].includes(state.boss.encounterState)) state.enemyBullets = [];
   }
   const enemyResult = checkBulletEnemyCollisions(state.bullets, state.enemies, {
     comboCount: state.combo, bonusMultiplier: difficulty.bonusMultiplier,
@@ -262,10 +305,25 @@ function advance(state, dt, input, events, random) {
     if (result.results.hitCount) emit(state, events, 'bossHit', { count: result.results.hitCount });
     if (result.results.bossDefeated) {
       state.sessionStats.bossesDefeated++; emit(state, events, 'bossKilled', { stage: state.currentStage });
-      state.phase = state.currentStage === STAGES[STAGES.length - 1] ? 'won' : 'transition';
-      state.transitionTimeLeft = state.phase === 'transition' ? 2 : 0;
-      if (state.phase === 'won') emit(state, events, 'sessionEnded', { outcome: 'won' });
+      state.boss = beginBossDeath(state.boss);
+      state.phase = 'bossDeath';
+      state.enemies = []; state.bullets = []; state.enemyBullets = [];
+      pendingBossVolley = null;
+    } else {
+      const phase = resolveBossPhase(state.boss, state.currentStage);
+      state.boss = phase.boss;
+      if (phase.changed) {
+        pendingBossVolley = null;
+        triggerScreenshake(state.shake, state.currentStage === 'stage3' ? 7 : 5.5, 0.25);
+        emit(state, events, 'bossPhaseChanged', { phaseIndex: state.boss.phaseIndex });
+      }
     }
+  }
+  if (pendingBossVolley && state.boss?.alive && state.boss.encounterState === BOSS_STATE.ATTACKING) {
+    const { pattern, target } = pendingBossVolley;
+    const shots = generateBossBullets(state.boss, pattern, state.currentStage, target.x, target.y);
+    state.enemyBullets.push(...shots.map(shot => identify(state, shot)));
+    emit(state, events, 'bossFired', { pattern, phaseIndex: state.boss.phaseIndex });
   }
   // Victory/transition resolves before hostile damage; no loss beneath a completion overlay.
   if (!isGameplayActive(state)) return;
@@ -297,7 +355,7 @@ function advance(state, dt, input, events, random) {
 
 /** At most six 1/60s substeps; discard excess suspension time, never catch up unbounded. */
 export function stepGameSession(snapshot, elapsed, input = {}, random = Math.random) {
-  if ((!isGameplayActive(snapshot) && snapshot.phase !== 'transition') || !Number.isFinite(elapsed) || elapsed <= 0) return { state: snapshot, events: [] };
+  if ((!isGameplayActive(snapshot) && snapshot.phase !== 'transition' && snapshot.phase !== 'bossDeath') || !Number.isFinite(elapsed) || elapsed <= 0) return { state: snapshot, events: [] };
   const state = copySnapshot(snapshot), events = [];
   const duration = Math.min(elapsed, MAX_FRAME_SECONDS);
   const steps = Math.max(1, Math.ceil(duration / (1 / 60)));

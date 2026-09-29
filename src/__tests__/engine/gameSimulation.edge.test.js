@@ -66,12 +66,13 @@ describe('live simulation edge contracts', () => {
     expect(result.state.enemyBullets[0].y).toBeCloseTo(-34);
   });
 
-  it('fires a single entry volley and applies only one cooldown per substep', () => {
+  it('does not fire an old entry volley before the authored first telegraph', () => {
     const state = { ...session(), phase: 'boss', boss: { ...createBoss('stage1', 400), fireCooldown: 0.01 } };
     const result = tick(state);
-    expect(result.events.filter(event => event.type === 'bossFired')).toHaveLength(1);
-    expect(result.state.boss.fireCooldown).toBeCloseTo(1.1 - 5 / 60);
-    expect(result.state.enemyBullets.some(projectile => projectile.y < 0 && projectile.vy > 0)).toBe(true);
+    expect(result.events.filter(event => event.type === 'bossFired')).toHaveLength(0);
+    expect(result.state.boss.encounterState).toBe('ANNOUNCING');
+    expect(result.state.boss.stateElapsed).toBeCloseTo(0.1);
+    expect(result.state.enemyBullets).toHaveLength(0);
   });
 
   it('reclaims escaped residents and fills the available quota exactly once', () => {
@@ -101,18 +102,25 @@ describe('live simulation edge contracts', () => {
     }
   });
 
-  it('crosses the arrival quota with one live spawn and one boss appearance event', () => {
+  it('crosses the same arrival quota once, clears hazards, then cues the delayed entrance once', () => {
     const state = { ...createGameSession(400, 800), initialWaveSpawned: true,
       enemySpawnTimer: calculateDifficultySettings(waves.stage1, 1).spawnInterval,
       totalEnemiesSpawned: waves.stage1.maxEnemies - 1 };
     const result = tick(state);
     expect(result.state.totalEnemiesSpawned).toBe(waves.stage1.maxEnemies);
-    expect(result.state.enemies).toHaveLength(1);
+    expect(result.state.enemies).toHaveLength(0);
     expect(result.state.boss.alive).toBe(true);
     expect(result.state.phase).toBe('boss');
-    expect(result.events.filter(event => event.type === 'bossAppeared')).toHaveLength(1);
+    expect(result.state.boss.encounterState).toBe('ANNOUNCING');
+    expect(result.events.filter(event => event.type === 'bossAppeared')).toHaveLength(0);
     expect(result.events.filter(event => event.type === 'music')).toEqual([expect.objectContaining({ track: 'boss' })]);
-    expect(tick(result.state).events.filter(event => event.type === 'bossAppeared')).toHaveLength(0);
+    let next = result.state, appearances = 0;
+    for (let i = 0; i < 15; i++) {
+      const advanced = tick(next); next = advanced.state;
+      appearances += advanced.events.filter(event => event.type === 'bossAppeared').length;
+    }
+    expect(appearances).toBe(1);
+    expect(next.boss.encounterState).toBe('ENTERING');
   });
 
   it('freezes transition gameplay clocks and resumes the surviving bonus after stage advance', () => {
@@ -146,12 +154,16 @@ describe('live simulation edge contracts', () => {
     state.bullets = [bullet(state.boss.x, 101), bullet(state.boss.x, 101)];
     state.enemyBullets = [bullet(state.player.x, state.player.y)];
     const result = tick(state);
-    expect(result.state.phase).toBe('won');
+    expect(result.state.phase).toBe('bossDeath');
     expect(result.state.player.lives).toBe(5);
     expect(result.events.filter(event => event.type === 'bossKilled')).toHaveLength(1);
-    expect(result.events.filter(event => event.type === 'sessionEnded')).toEqual([expect.objectContaining({ outcome: 'won' })]);
-    expect(tick(result.state).events).toEqual([]);
-    expect(commandGameSession(result.state, { type: 'resume' }).state.phase).toBe('won');
+    expect(result.events.filter(event => event.type === 'sessionEnded')).toHaveLength(0);
+    let next = result.state, terminal = [];
+    for (let i = 0; i < 15; i++) { const advanced = tick(next); next = advanced.state; terminal.push(...advanced.events); }
+    expect(next.phase).toBe('won');
+    expect(terminal.filter(event => event.type === 'sessionEnded')).toEqual([expect.objectContaining({ outcome: 'won' })]);
+    expect(tick(next).events).toEqual([]);
+    expect(commandGameSession(next, { type: 'resume' }).state.phase).toBe('won');
   });
 
   it('leaves every part of a populated prior snapshot unchanged', () => {

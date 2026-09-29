@@ -58,14 +58,14 @@ it('anchors boss contact to each consumed overlap while preserving its legacy RN
   expect(boss.hp).toBe(100);
 });
 
-it('preserves boss death duration, particle burst, score and RNG sequence', () => {
+it('resolves boss death contact and score once while deferring spectacle to the simulation clock', () => {
   const result = checkBulletBossCollisions([bullet], { ...boss, hp: 1 });
-  expect(random).toHaveBeenCalledTimes(957); // 26 impact + 525 boss + 405 debris + score ID.
+  expect(random).toHaveBeenCalledTimes(26); // Only the preserved contact sample is made here.
   expect(result.results.bossDefeated).toBe(true);
   expect(result.results.scoreGain).toBe(1000);
-  expect(result.results.explosions[0]).toMatchObject({ maxRadius: 80, life: 0.6, maxLife: 0.6 });
-  expect(result.results.particles.filter(p => p.type === 'boss')).toHaveLength(75);
-  expect(result.results.particles.filter(p => p.type === 'debris')).toHaveLength(60);
+  expect(result.updatedBoss).toMatchObject({ hp: 0, alive: false });
+  expect(result.results.explosions).toHaveLength(0);
+  expect(result.results.particles.filter(p => p.type === 'contact')).toHaveLength(1);
 });
 
 it('gives particle and explosion records stable IDs without consuming extra randomness', () => {

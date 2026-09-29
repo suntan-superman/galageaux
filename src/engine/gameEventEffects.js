@@ -63,6 +63,12 @@ export function playGameEventSounds(events) {
       case 'bossKilled':
         Audio.playSound('bossDeath', 0.8);
         break;
+      case 'bossPhaseChanged':
+        Audio.playSound('levelUp', 0.35);
+        break;
+      case 'victory':
+        Audio.playSound('levelUp', 0.8);
+        break;
       case 'playerHit':
         Audio.playSound('playerHit', 0.8);
         break;

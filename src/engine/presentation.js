@@ -13,10 +13,10 @@ export function createPresentationState(snapshot) {
  */
 export function advancePresentation(previous, snapshot, elapsed = 0) {
   const current = previous.sessionId === snapshot.sessionId ? previous : createPresentationState(snapshot);
-  const active = ['playing', 'bonus', 'boss', 'transition'].includes(snapshot.phase);
+  const active = ['playing', 'bonus', 'boss', 'bossDeath', 'transition'].includes(snapshot.phase);
   const dt = active && Number.isFinite(elapsed) ? clamp(elapsed, 0, PRESENTATION.maxStep) : 0;
   if (!dt) return current;
-  const velocityX = snapshot.phase === 'transition' ? 0 : (snapshot.player.x - current.playerX) / dt;
+  const velocityX = ['transition', 'bossDeath'].includes(snapshot.phase) ? 0 : (snapshot.player.x - current.playerX) / dt;
   const hp = snapshot.boss?.alive ? snapshot.boss.hp : null;
   // Actual HP is always drawn immediately. This is only its short trailing band.
   const bossHealth = hp === null ? null : current.bossHealth === null || hp > current.bossHealth
