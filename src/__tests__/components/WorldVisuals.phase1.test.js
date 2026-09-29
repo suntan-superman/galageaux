@@ -26,6 +26,18 @@ describe('Phase 1 world materials and overlay contracts', () => {
     const nodes = flatten(Enemies({ enemies, hitFlashes: { b: 0.5 } }));
     expect(nodes.filter(node => node.type === 'Path' && node.props.color === PALETTE.core)).toHaveLength(1);
   });
+  it('banks an enemy only inside its authoritative unrotated position and size transform', () => {
+    const enemy = Object.freeze({ id: 'banked', type: 'dive', x: 40, y: 80, size: 24,
+      flightState: 'ATTACKING', heading: 0.3, anticipation: 0.5 });
+    const tree = Enemies({ enemies: [enemy], ox: 2, oy: -3 });
+    const outer = tree.props.children[0];
+    expect(outer.props.transform).toEqual([{ translateX: 42 }, { translateY: 77 }, { scale: 24 }]);
+    const inner = flatten(outer).find(node => node !== outer && node.type === 'Group');
+    expect(inner.props.transform).toEqual([{ translateX: 0.5 }, { translateY: 0.5 },
+      { rotate: 0.3 }, { translateX: -0.5 }, { translateY: -0.5 }]);
+    expect(flatten(outer).some(node => node.type === 'Path' && node.props.style === 'stroke' && node.props.opacity === 0.325)).toBe(true);
+    expect(enemy).toMatchObject({ x: 40, y: 80 });
+  });
   it('preserves boss silhouette and positions while adding a bounded local contact flash', () => {
     const boss = Object.freeze({ x: 100, y: 90, width: 80, height: 60, hp: 60, maxHp: 100, alive: true });
     const nodes = flatten(BossShip({ boss, hitFlash: 0.5, showHealthBar: false }));

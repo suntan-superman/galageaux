@@ -101,8 +101,7 @@ describe('mounted production GameScreen frame contract', () => {
   it('commits multiple frames even when React has not rendered between them', async () => {
     await mount(false);
     await frame(16); await frame(16);
-    const y = props('Enemies').enemies[0].y;
-    const speed = props('Enemies').enemies[0].speed;
+    const before = props('Enemies').enemies[0];
     await act(async () => {
       for (let i = 0; i < 3; i++) {
         now += 16;
@@ -110,7 +109,10 @@ describe('mounted production GameScreen frame contract', () => {
         callbacks.forEach(callback => callback(now));
       }
     });
-    expect(props('Enemies').enemies[0].y).toBeCloseTo(y + speed * 0.048, 6);
+    const after = props('Enemies').enemies[0];
+    expect(after.id).toBe(before.id);
+    expect(after.pathElapsed).toBeCloseTo(before.pathElapsed + 0.048, 6);
+    expect(after.y).toBeGreaterThan(before.y);
   });
   it('backgrounds into pause and discards suspension time on explicit resume', async () => {
     await mount(false); await advance(0.1);
@@ -125,7 +127,8 @@ describe('mounted production GameScreen frame contract', () => {
     await frame(60000);
     expect(props('Enemies').enemies[0]).toEqual(before);
     await frame(16);
-    expect(props('Enemies').enemies[0].y).toBeCloseTo(before.y + before.speed * 0.016, 6);
+    expect(props('Enemies').enemies[0].pathElapsed).toBeCloseTo(before.pathElapsed + 0.016, 6);
+    expect(props('Enemies').enemies[0].y).toBeGreaterThan(before.y);
   });
   it('retry clears session HUD, transient feedback, counters and terminal overlays', async () => {
     const seed = Simulation.createGameSession(400, 800);

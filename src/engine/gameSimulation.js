@@ -15,6 +15,7 @@ import { createPowerup, updatePowerup, POWERUP_DURATION } from './powerups';
 import { spawnExplosion, spawnExplosionParticles, spawnShieldRipple, updateParticles, updateExplosion } from './particles';
 import { createScreenshake, triggerScreenshake, updateScreenshake } from './screenshake';
 import { applyAllLimits } from './entityLimits';
+import { prepareFlightWave, advanceEnemyFlight } from './enemyFlight';
 
 export const MAX_FRAME_SECONDS = 0.1;
 export const isGameplayActive = state => ['playing', 'bonus', 'boss'].includes(state.phase);
@@ -24,7 +25,7 @@ const activePhase = state => state.boss?.alive ? 'boss' : state.bonusTimeLeft > 
 export function createGameSession(width, height, tutorial = false, sessionId = 1) {
   return {
     sessionId, width, height, phase: tutorial ? 'tutorial' : 'playing', resumePhase: null,
-    time: 0, nextEntityId: 1, nextEventId: 1,
+    time: 0, nextEntityId: 1, nextEventId: 1, nextFormationId: 1,
     player: { x: width / 2 - PLAYER_WIDTH / 2, y: height * 0.8, width: PLAYER_WIDTH,
       height: PLAYER_HEIGHT, alive: true, lives: 5, weaponLevel: 1, weaponType: null, shield: false, rapidFire: false },
     bullets: [], enemyBullets: [], enemies: [], particles: [], explosions: [], powerups: [],
@@ -147,7 +148,9 @@ function addWave(state, difficulty, stage, random) {
     fireCooldownMultiplier: difficulty.enemyFireCooldownMultiplier,
   }).slice(0, space);
   state.totalEnemiesSpawned += spawned.length;
-  state.enemies.push(...spawned.map(enemy => identify(state, { ...enemy, speed: enemy.speed * (state.timers.slow > 0 ? 0.6 : 1) })));
+  const flightWave = prepareFlightWave(spawned, { width: state.width, height: state.height,
+    time: state.time, stage: state.currentStage, level: state.level, waveId: state.nextFormationId++ });
+  state.enemies.push(...flightWave.map(enemy => identify(state, { ...enemy, speed: enemy.speed * (state.timers.slow > 0 ? 0.6 : 1) })));
   state.initialWaveSpawned = true; state.enemySpawnTimer = 0;
 }
 function moveBullet(bullet, dt, fallbackDirection) {
@@ -198,6 +201,8 @@ function advance(state, dt, input, events, random) {
   state.enemyBullets = state.enemyBullets.map(bullet => moveBullet(bullet, dt, 1)).filter(bullet => bulletInBounds(bullet, state));
   state.powerups = state.powerups.map(powerup => updatePowerup(powerup, dt)).filter(powerup => powerup.y < state.height + powerup.size && !powerup.collected);
   state.enemies = state.enemies.map(enemy => {
+    if (enemy.flightState) return advanceEnemyFlight(enemy, dt, { width: state.width, height: state.height,
+      time: state.time, level: state.level, player: state.player });
     let x = enemy.x, y = enemy.y + enemy.speed * dt;
     if (enemy.behavior === 'chase') {
       const dx = state.player.x + state.player.width / 2 - enemy.x - enemy.size / 2;
@@ -207,7 +212,7 @@ function advance(state, dt, input, events, random) {
     } else if (enemy.pattern === 'zigzag') x = enemy.baseX + Math.sin(y / state.height * Math.PI * 4) * 40;
     else if (enemy.pattern === 'dive') x = enemy.baseX + Math.sin(y / state.height * Math.PI * 2) * 70;
     return { ...enemy, x, y };
-  }).filter(enemy => enemy.y <= state.height);
+  }).filter(enemy => enemy && enemy.y <= state.height);
   for (const enemy of state.enemies) {
     if (!enemy.canShoot) continue;
     enemy.fireCooldown = (enemy.fireCooldown ?? 0) - dt;
