@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { Canvas, Rect, Circle } from '@shopify/react-native-skia';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { STORAGE_KEYS } from '../constants/game';
 import * as AudioManager from '../engine/audio';
 import GameScreen from './GameScreen';
 import AuthScreen from './AuthScreen';
@@ -8,6 +10,25 @@ import AchievementsScreen from './AchievementsScreen';
 import SettingsScreen from './SettingsScreen';
 import StatsScreen from './StatsScreen';
 import AudioStatusBadge from '../components/AudioStatusBadge';
+
+function MenuButton({ label, icon, width, onPress, style, textStyle }) {
+  return (
+    <TouchableOpacity
+      style={[styles.button, { width }, style]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      {icon && <Text style={styles.buttonIcon} accessible={false} numberOfLines={1}>{icon}</Text>}
+      <Text
+        style={[styles.buttonText, textStyle]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.9}
+      >{label}</Text>
+    </TouchableOpacity>
+  );
+}
 
 export default function MainMenu() {
   const { width, height } = useWindowDimensions();
@@ -17,24 +38,48 @@ export default function MainMenu() {
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [statsVisible, setStatsVisible] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const preferencesRestored = useRef(false);
+  const audioInitialization = useRef(null);
+  const menuVisible = !inGame && !authVisible && !achievementsVisible && !settingsVisible && !statsVisible;
+  const buttonWidth = Math.min(320, Math.max(0, width - 48));
 
-  // Initialize audio and play menu music
+  // Restore preferences before cold-menu playback; never save scaled track gain.
+  // MainMenu stays mounted behind its child routes, so re-request music on return.
   useEffect(() => {
-    let mounted = true;
-    
+    if (!menuVisible) return;
+    let cancelled = false;
     const initAudio = async () => {
-      await AudioManager.initializeAudio();
-      if (mounted) {
+      if (!preferencesRestored.current) {
+        try {
+          const stored = await AsyncStorage.getItem(STORAGE_KEYS.AUDIO_SETTINGS);
+          if (cancelled) return;
+          const settings = stored ? JSON.parse(stored) : null;
+          if (settings && typeof settings === 'object') {
+            if (typeof settings.soundsEnabled === 'boolean') AudioManager.setSoundsEnabled(settings.soundsEnabled);
+            if (Number.isFinite(settings.soundVolume)) AudioManager.setSoundVolume(settings.soundVolume);
+            if (Number.isFinite(settings.musicVolume)) await AudioManager.setMusicVolume(settings.musicVolume);
+            if (cancelled) return;
+            if (typeof settings.musicEnabled === 'boolean') await AudioManager.setMusicEnabled(settings.musicEnabled);
+          }
+        } catch (error) {
+          console.warn('Failed to restore menu audio settings:', error);
+        }
+        if (cancelled) return;
+        preferencesRestored.current = true;
+      }
+      // Reuse this menu's pending initialization if navigation returns quickly.
+      if (!audioInitialization.current) {
+        audioInitialization.current = AudioManager.initializeAudio().finally(() => { audioInitialization.current = null; });
+      }
+      await audioInitialization.current;
+      if (!cancelled && AudioManager.getAudioSettings().musicEnabled) {
         await AudioManager.playMusic('menu');
       }
     };
-    
-    initAudio();
-    
-    return () => {
-      mounted = false;
-    };
-  }, []);
+
+    initAudio().catch(error => console.warn('Menu audio initialization failed:', error));
+    return () => { cancelled = true; };
+  }, [menuVisible]);
 
   const handlePlayClick = () => {
     AudioManager.playSound('uiClick', 0.6);
@@ -93,26 +138,14 @@ export default function MainMenu() {
         <View style={styles.centerSection}>
           <Text style={styles.title}>GALAGEAUX</Text>
           <Text style={styles.subtitle}>Vertical neon space shooter</Text>
-          <TouchableOpacity style={styles.button} onPress={handlePlayClick}>
-            <Text style={styles.buttonText}>PLAY</Text>
-          </TouchableOpacity>
+          <MenuButton label="PLAY" width={buttonWidth} onPress={handlePlayClick} />
         </View>
         <View style={styles.bottomSection}>
-          <TouchableOpacity style={[styles.button, styles.tutorialButton]} onPress={handleTutorialClick}>
-            <Text style={[styles.buttonText, styles.tutorialButtonText]}>SHOW ME HOW</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.button, styles.achievementsButton]} onPress={handleAchievementsClick}>
-            <Text style={[styles.buttonText, styles.achievementsButtonText]}>🏆 ACHIEVEMENTS</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.button, styles.settingsButton]} onPress={handleSettingsClick}>
-            <Text style={[styles.buttonText, styles.settingsButtonText]}>⚙️ SETTINGS</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.button, styles.statsButton]} onPress={handleStatsClick}>
-            <Text style={[styles.buttonText, styles.statsButtonText]}>📊 STATS</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={handleAccountClick}>
-            <Text style={[styles.buttonText, styles.secondaryButtonText]}>ACCOUNT</Text>
-          </TouchableOpacity>
+          <MenuButton label="SHOW ME HOW" width={buttonWidth} style={styles.tutorialButton} textStyle={styles.tutorialButtonText} onPress={handleTutorialClick} />
+          <MenuButton label="ACHIEVEMENTS" icon="🏆" width={buttonWidth} style={styles.achievementsButton} textStyle={styles.achievementsButtonText} onPress={handleAchievementsClick} />
+          <MenuButton label="SETTINGS" icon="⚙️" width={buttonWidth} style={styles.settingsButton} textStyle={styles.settingsButtonText} onPress={handleSettingsClick} />
+          <MenuButton label="STATS" icon="📊" width={buttonWidth} style={styles.statsButton} textStyle={styles.statsButtonText} onPress={handleStatsClick} />
+          <MenuButton label="ACCOUNT" width={buttonWidth} style={styles.secondaryButton} textStyle={styles.secondaryButtonText} onPress={handleAccountClick} />
         </View>
       </View>
     </View>
@@ -159,20 +192,23 @@ const styles = StyleSheet.create({
     marginBottom: 32
   },
   button: {
-    width: 260,
-    paddingHorizontal: 40,
+    paddingHorizontal: 16,
     paddingVertical: 14,
     backgroundColor: '#22c55e',
     borderRadius: 999,
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8
   },
+  buttonIcon: { fontSize: 20, width: 24, textAlign: 'center' },
   buttonText: {
     color: '#020617',
     fontWeight: '800',
     fontSize: 16,
     letterSpacing: 2,
-    textAlign: 'center'
+    textAlign: 'center',
+    flexShrink: 1
   },
   tutorialButton: {
     backgroundColor: 'transparent',

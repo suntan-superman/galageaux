@@ -14,6 +14,9 @@ import enemiesConfig from '../config/enemies.json';
  * @property {string[]} patterns - Available movement patterns for the stage
  * @property {string[]} [enemyTypes] - Allowed types from the active stage
  * @property {function} [random] - Random source for repeatable simulation tests
+ * @property {number} [formationChance=0.6] - Existing V/line formation probability
+ * @property {number} [formationSize=5] - Members in an existing formation
+ * @property {number} [fireCooldownMultiplier=1] - Initial shot delay adjustment
  */
 
 /**
@@ -79,7 +82,7 @@ export function selectEnemyType(roll = Math.random(), enemyTypes) {
  * @param {boolean} options.canShoot - Whether enemy can fire
  * @returns {Enemy}
  */
-export function createEnemy({ type, x, y, baseSpeed, pattern, canShoot, random = Math.random }) {
+export function createEnemy({ type, x, y, baseSpeed, pattern, canShoot, random = Math.random, fireCooldownMultiplier = 1 }) {
   const cfg = enemiesConfig[type] || enemiesConfig['grunt'];
   const speed = baseSpeed * (cfg.speed ?? 1);
   return {
@@ -95,7 +98,7 @@ export function createEnemy({ type, x, y, baseSpeed, pattern, canShoot, random =
     pattern,
     // Explicit JSON flags win; omitted flags preserve the live type default.
     canShoot: cfg.canShoot ?? canShoot ?? ENEMY_WEIGHTS[type]?.canShoot ?? false,
-    fireCooldown: random() * 1.5 + 0.5,
+    fireCooldown: (random() * 1.5 + 0.5) * fireCooldownMultiplier,
     behavior: cfg.behavior || 'normal'
   };
 }
@@ -108,8 +111,9 @@ export function createEnemy({ type, x, y, baseSpeed, pattern, canShoot, random =
  */
 export function spawnWave(config, onSpawnCount) {
   const roll = (config.random || Math.random)();
-  if (roll < 0.3) return spawnFormation('v', config, onSpawnCount);
-  if (roll < 0.6) return spawnFormation('line', config, onSpawnCount);
+  const formationChance = config.formationChance ?? 0.6;
+  if (roll < formationChance / 2) return spawnFormation('v', config, onSpawnCount);
+  if (roll < formationChance) return spawnFormation('line', config, onSpawnCount);
   return spawnSingleEnemy(config, onSpawnCount);
 }
 
@@ -123,7 +127,7 @@ export function spawnWave(config, onSpawnCount) {
 export function spawnFormation(type, config, onSpawnCount) {
   const { width, enemySpeed, enemyTypes, random = Math.random } = config;
   const created = [];
-  const count = 5;
+  const count = config.formationSize ?? 5;
   const offsets = getFormationOffsets(type, count);
   const baseX = width / 2;
   const yStart = -ENEMY_SIZE * 2;
@@ -142,7 +146,8 @@ export function spawnFormation(type, config, onSpawnCount) {
       baseSpeed: enemySpeed,
       pattern: type === 'v' ? 'dive' : 'zigzag',
       canShoot,
-      random
+      random,
+      fireCooldownMultiplier: config.fireCooldownMultiplier
     }));
     
     onSpawnCount?.(1);
@@ -175,7 +180,8 @@ export function spawnSingleEnemy(config, onSpawnCount) {
     baseSpeed: enemySpeed,
     pattern,
     canShoot,
-    random
+    random,
+    fireCooldownMultiplier: config.fireCooldownMultiplier
   }));
   
   onSpawnCount?.(1);

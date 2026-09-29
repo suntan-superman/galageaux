@@ -5,6 +5,8 @@ import * as Achievements from '../../engine/achievements';
 import * as Simulation from '../../engine/gameSimulation';
 import { AppState } from 'react-native';
 import { createEnemy } from '../../engine/spawner';
+import { calculateDifficultySettings } from '../../engine/difficulty';
+import waves from '../../config/waves.json';
 
 jest.mock('react-native', () => ({
   View: 'View', StyleSheet: { create: styles => styles },
@@ -66,7 +68,7 @@ describe('mounted production GameScreen frame contract', () => {
   });
   it('inserts each timed spawn exactly once', async () => {
     await mount(false);
-    await advance(2.1);
+    await advance(calculateDifficultySettings(waves.stage1, 1).spawnInterval + 0.1);
     const enemies = props('Enemies').enemies;
     expect(enemies.length).toBeGreaterThan(1);
     expect(new Set(enemies.map(enemy => `${enemy.x}:${enemy.y}`)).size).toBe(enemies.length);

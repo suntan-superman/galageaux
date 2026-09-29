@@ -75,7 +75,8 @@ describe('live simulation edge contracts', () => {
   });
 
   it('reclaims escaped residents and fills the available quota exactly once', () => {
-    const state = { ...createGameSession(400, 800), initialWaveSpawned: true, enemySpawnTimer: 2 };
+    const state = { ...createGameSession(400, 800), initialWaveSpawned: true,
+      enemySpawnTimer: calculateDifficultySettings(waves.stage1, 1).spawnInterval };
     const capacity = calculateDifficultySettings(waves.stage1, 1).maxEnemies;
     state.enemies = Array.from({ length: capacity }, (_, index) => enemy('grunt', { id: `old-${index}`, y: index ? 200 : 801 }));
     const result = tick(state, 1 / 60);
@@ -101,7 +102,8 @@ describe('live simulation edge contracts', () => {
   });
 
   it('crosses the arrival quota with one live spawn and one boss appearance event', () => {
-    const state = { ...createGameSession(400, 800), initialWaveSpawned: true, enemySpawnTimer: 2,
+    const state = { ...createGameSession(400, 800), initialWaveSpawned: true,
+      enemySpawnTimer: calculateDifficultySettings(waves.stage1, 1).spawnInterval,
       totalEnemiesSpawned: waves.stage1.maxEnemies - 1 };
     const result = tick(state);
     expect(result.state.totalEnemiesSpawned).toBe(waves.stage1.maxEnemies);

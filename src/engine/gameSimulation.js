@@ -6,7 +6,7 @@ import waves from '../config/waves.json';
 import { STAGES } from '../constants/game';
 import { PLAYER_WIDTH, PLAYER_HEIGHT, BULLET_WIDTH, BULLET_HEIGHT } from '../entities/types';
 import { spawnWave, createEnemyBullet } from './spawner';
-import { calculateDifficultySettings, getLevelTarget } from './difficulty';
+import { calculateDifficultySettings, calculateEnemyFireCooldown, getLevelTarget } from './difficulty';
 import { createPlayerBullets } from './projectiles';
 import { createBoss, updateBoss, bossCurrentPattern } from './boss';
 import { generateBossBullets } from './boss-patterns';
@@ -140,7 +140,11 @@ function agePresentation(state, dt) {
 }
 function addWave(state, difficulty, stage, random) {
   const space = Math.max(0, difficulty.maxEnemies - state.enemies.length);
-  const spawned = spawnWave({ width: state.width, enemySpeed: difficulty.enemySpeed, patterns: stage.patterns, enemyTypes: stage.enemyTypes, random }).slice(0, space);
+  const spawned = spawnWave({
+    width: state.width, enemySpeed: difficulty.enemySpeed, patterns: stage.patterns, enemyTypes: stage.enemyTypes, random,
+    formationChance: difficulty.formationChance, formationSize: difficulty.formationSize,
+    fireCooldownMultiplier: difficulty.enemyFireCooldownMultiplier,
+  }).slice(0, space);
   state.totalEnemiesSpawned += spawned.length;
   state.enemies.push(...spawned.map(enemy => identify(state, { ...enemy, speed: enemy.speed * (state.timers.slow > 0 ? 0.6 : 1) })));
   state.initialWaveSpawned = true; state.enemySpawnTimer = 0;
@@ -208,8 +212,7 @@ function advance(state, dt, input, events, random) {
     enemy.fireCooldown = (enemy.fireCooldown ?? 0) - dt;
     if (enemy.fireCooldown <= 0 && enemy.y > 0 && enemy.y < state.height * 0.8) {
       state.enemyBullets.push(identify(state, createEnemyBullet(enemy, BULLET_WIDTH, BULLET_HEIGHT, difficulty.enemyBulletSpeed)));
-      enemy.fireCooldown = enemy.type === 'elite' ? 0.4 + random() * 0.3
-        : (state.level <= 2 ? 2.5 : state.level <= 4 ? 1.8 : 1.2) + random() * (state.level <= 2 ? 1.5 : state.level <= 4 ? 1.2 : 1.3);
+      enemy.fireCooldown = calculateEnemyFireCooldown(state.level, enemy.type, random, difficulty.enemyFireCooldownMultiplier);
     }
   }
   if (!state.bossSpawned) {

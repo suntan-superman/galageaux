@@ -11,7 +11,33 @@
       "dive",
       "formation_v"
     ],
-    "enemyTypes": ["grunt", "shooter", "dive"]
+    "enemyTypes": ["grunt", "shooter", "dive"],
+    "openingPacing": {
+      "1": {
+        "spawnIntervalMultiplier": 1.6,
+        "residentCap": 4,
+        "enemySpeedMultiplier": 0.7,
+        "enemyFireCooldownMultiplier": 1.8,
+        "formationChance": 0,
+        "formationSize": 1
+      },
+      "2": {
+        "spawnIntervalMultiplier": 1.35,
+        "residentCap": 8,
+        "enemySpeedMultiplier": 0.85,
+        "enemyFireCooldownMultiplier": 1.35,
+        "formationChance": 0.2,
+        "formationSize": 3
+      },
+      "3": {
+        "spawnIntervalMultiplier": 1.1,
+        "residentCap": 16,
+        "enemySpeedMultiplier": 0.95,
+        "enemyFireCooldownMultiplier": 1.1,
+        "formationChance": 0.5,
+        "formationSize": 5
+      }
+    }
   },
   "stage2": {
     "name": "Nebula Assault",

@@ -1,7 +1,55 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
 import { PLAYER } from '../constants/game';
 import { normalizeTiltSensitivity } from '../engine/inputSettings';
+
+function ControlRow({ label, value, checked, onPress }) {
+  return (
+    <TouchableOpacity
+      style={styles.controlRow}
+      onPress={onPress}
+      accessibilityRole={checked === undefined ? 'button' : 'switch'}
+      accessibilityLabel={`${label}: ${value}`}
+      accessibilityState={checked === undefined ? undefined : { checked }}
+    >
+      <Text style={styles.controlLabel}>{label}</Text>
+      <Text style={styles.controlValue} numberOfLines={1}>{value}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function ValueRow({ id, label, value, decreaseDisabled, increaseDisabled, onDecrease, onIncrease }) {
+  return (
+    <View style={styles.valueRow} testID={`pause-${id}-row`}>
+      <Text style={styles.valueLabel}>{label}</Text>
+      <View style={styles.stepper}>
+        <TouchableOpacity
+          style={[styles.adjustButton, decreaseDisabled && styles.adjustButtonDisabled]}
+          onPress={onDecrease}
+          disabled={decreaseDisabled}
+          accessibilityRole="button"
+          accessibilityLabel={`Decrease ${label.toLowerCase()}`}
+          accessibilityState={{ disabled: decreaseDisabled }}
+        >
+          <Text style={styles.adjustButtonText}>-</Text>
+        </TouchableOpacity>
+        <Text style={styles.numericValue} numberOfLines={1} accessibilityLabel={`${label}: ${value}`}>
+          {value}
+        </Text>
+        <TouchableOpacity
+          style={[styles.adjustButton, increaseDisabled && styles.adjustButtonDisabled]}
+          onPress={onIncrease}
+          disabled={increaseDisabled}
+          accessibilityRole="button"
+          accessibilityLabel={`Increase ${label.toLowerCase()}`}
+          accessibilityState={{ disabled: increaseDisabled }}
+        >
+          <Text style={styles.adjustButtonText}>+</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
 
 export default function PauseOverlay({
   visible,
@@ -31,123 +79,64 @@ export default function PauseOverlay({
   );
 
   return (
-    <View style={styles.overlay} pointerEvents="auto">
+    <ScrollView
+      style={styles.overlay}
+      contentContainerStyle={styles.overlayContent}
+      contentInsetAdjustmentBehavior="automatic"
+      bounces={false}
+      alwaysBounceVertical={false}
+      overScrollMode="never"
+      showsVerticalScrollIndicator={false}
+      accessibilityViewIsModal={true}
+    >
+      {/* Native automatic insets need no app-level SafeAreaProvider. Designed
+          for ordinary text sizes; scrolling provides an overflow escape. */}
       <View style={styles.card}>
-        <Text style={styles.title}>Paused</Text>
-        <Text style={styles.subtitle}>Take a breather, pilot.</Text>
-
-        <TouchableOpacity style={styles.buttonPrimary} onPress={onResume}>
+        <Text style={styles.title} accessibilityRole="header">PAUSED</Text>
+        <TouchableOpacity style={styles.buttonPrimary} onPress={onResume} accessibilityRole="button">
           <Text style={styles.buttonPrimaryText}>Resume</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.buttonSecondary} onPress={onToggleAutoFire}>
-          <Text style={styles.buttonSecondaryText}>
-            Auto-Fire: {autoFire ? 'On' : 'Off'}
-          </Text>
-        </TouchableOpacity>
+        <Text style={styles.sectionHeading} accessibilityRole="header">Gameplay</Text>
+        <ControlRow label="Auto-Fire" value={autoFire ? 'On' : 'Off'} checked={Boolean(autoFire)} onPress={onToggleAutoFire} />
+        <ControlRow label="Tilt Control" value={tiltControl ? 'On' : 'Off'} checked={Boolean(tiltControl)} onPress={onToggleTiltControl} />
+        <ControlRow label="Fire Button" value={fireButtonPosition === 'left' ? 'Left' : 'Right'} onPress={onToggleFireButtonPosition} />
+        <ValueRow
+          id="tilt"
+          label="Tilt Sensitivity"
+          value={sensitivity.toFixed(1)}
+          decreaseDisabled={sensitivity <= PLAYER.TILT_SENSITIVITY_MIN}
+          increaseDisabled={sensitivity >= PLAYER.TILT_SENSITIVITY_MAX}
+          onDecrease={() => adjustSensitivity(-0.1)}
+          onIncrease={() => adjustSensitivity(0.1)}
+        />
 
-        <TouchableOpacity style={styles.buttonSecondary} onPress={onToggleTiltControl}>
-          <Text style={styles.buttonSecondaryText}>
-            Tilt Control: {tiltControl ? 'On' : 'Off'}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.buttonSecondary} onPress={onToggleFireButtonPosition}>
-          <Text style={styles.buttonSecondaryText}>
-            Fire Button: {fireButtonPosition === 'left' ? 'Left' : 'Right'}
-          </Text>
-        </TouchableOpacity>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Tilt Sensitivity</Text>
-          <View style={styles.sensitivityRow}>
-            <TouchableOpacity
-              style={[styles.adjustButton, sensitivity <= PLAYER.TILT_SENSITIVITY_MIN && styles.adjustButtonDisabled]}
-              onPress={() => adjustSensitivity(-0.1)}
-              disabled={sensitivity <= PLAYER.TILT_SENSITIVITY_MIN}
-            >
-              <Text style={styles.adjustButtonText}>-</Text>
-            </TouchableOpacity>
-            <Text style={styles.sensitivityValue}>{sensitivity.toFixed(1)}</Text>
-            <TouchableOpacity
-              style={[styles.adjustButton, sensitivity >= PLAYER.TILT_SENSITIVITY_MAX && styles.adjustButtonDisabled]}
-              onPress={() => adjustSensitivity(0.1)}
-              disabled={sensitivity >= PLAYER.TILT_SENSITIVITY_MAX}
-            >
-              <Text style={styles.adjustButtonText}>+</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <TouchableOpacity style={styles.buttonSecondary} onPress={onToggleSounds}>
-          <Text style={styles.buttonSecondaryText}>
-            Sound FX: {soundsEnabled ? 'On' : 'Off'}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.buttonSecondary} onPress={onToggleMusic}>
-          <Text style={styles.buttonSecondaryText}>
-            Music: {musicEnabled ? 'On' : 'Off'}
-          </Text>
-        </TouchableOpacity>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Sound Volume</Text>
-          <View style={styles.sensitivityRow}>
-            <TouchableOpacity
-              style={[styles.adjustButton, soundVolume <= 0 && styles.adjustButtonDisabled]}
-              onPress={() => onChangeSoundVolume(Math.max(0, soundVolume - 0.1))}
-              disabled={soundVolume <= 0}
-            >
-              <Text style={styles.adjustButtonText}>-</Text>
-            </TouchableOpacity>
-            <Text style={styles.sensitivityValue}>{Math.round(soundVolume * 100)}%</Text>
-            <TouchableOpacity
-              style={[styles.adjustButton, soundVolume >= 1 && styles.adjustButtonDisabled]}
-              onPress={() => onChangeSoundVolume(Math.min(1, soundVolume + 0.1))}
-              disabled={soundVolume >= 1}
-            >
-              <Text style={styles.adjustButtonText}>+</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Music Volume</Text>
-          <View style={styles.sensitivityRow}>
-            <TouchableOpacity
-              style={[styles.adjustButton, musicVolume <= 0 && styles.adjustButtonDisabled]}
-              onPress={() => onChangeMusicVolume(Math.max(0, musicVolume - 0.1))}
-              disabled={musicVolume <= 0}
-            >
-              <Text style={styles.adjustButtonText}>-</Text>
-            </TouchableOpacity>
-            <Text style={styles.sensitivityValue}>{Math.round(musicVolume * 100)}%</Text>
-            <TouchableOpacity
-              style={[styles.adjustButton, musicVolume >= 1 && styles.adjustButtonDisabled]}
-              onPress={() => onChangeMusicVolume(Math.min(1, musicVolume + 0.1))}
-              disabled={musicVolume >= 1}
-            >
-              <Text style={styles.adjustButtonText}>+</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <TouchableOpacity style={styles.exitButton} onPress={onExit}>
+        <Text style={styles.sectionHeading} accessibilityRole="header">Audio</Text>
+        <ControlRow label="Sound FX" value={soundsEnabled ? 'On' : 'Off'} checked={Boolean(soundsEnabled)} onPress={onToggleSounds} />
+        <ControlRow label="Music" value={musicEnabled ? 'On' : 'Off'} checked={Boolean(musicEnabled)} onPress={onToggleMusic} />
+        <ValueRow
+          id="sound"
+          label="Sound Volume"
+          value={`${Math.round(soundVolume * 100)}%`}
+          decreaseDisabled={soundVolume <= 0}
+          increaseDisabled={soundVolume >= 1}
+          onDecrease={() => onChangeSoundVolume(Math.max(0, soundVolume - 0.1))}
+          onIncrease={() => onChangeSoundVolume(Math.min(1, soundVolume + 0.1))}
+        />
+        <ValueRow
+          id="music"
+          label="Music Volume"
+          value={`${Math.round(musicVolume * 100)}%`}
+          decreaseDisabled={musicVolume <= 0}
+          increaseDisabled={musicVolume >= 1}
+          onDecrease={() => onChangeMusicVolume(Math.max(0, musicVolume - 0.1))}
+          onIncrease={() => onChangeMusicVolume(Math.min(1, musicVolume + 0.1))}
+        />
+        <TouchableOpacity style={styles.exitButton} onPress={onExit} accessibilityRole="button">
           <Text style={styles.exitButtonText}>Quit to Menu</Text>
         </TouchableOpacity>
-
-        <View style={styles.legalLinks}>
-          <TouchableOpacity onPress={() => Linking.openURL('https://galageaux.com/terms')}>
-            <Text style={styles.legalLinkText}>Terms of Service</Text>
-          </TouchableOpacity>
-          <Text style={styles.legalLinkSeparator}>•</Text>
-          <TouchableOpacity onPress={() => Linking.openURL('https://galageaux.com/privacy')}>
-            <Text style={styles.legalLinkText}>Privacy Policy</Text>
-          </TouchableOpacity>
-        </View>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -159,85 +148,123 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(2,6,23,0.85)',
+    zIndex: 10
+  },
+  overlayContent: {
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
-    zIndex: 10
+    paddingHorizontal: 16,
+    paddingVertical: 16
   },
   card: {
     width: '100%',
-    maxWidth: 320,
+    maxWidth: 360,
     backgroundColor: 'rgba(15,23,42,0.9)',
     borderRadius: 24,
-    padding: 24,
+    padding: 12,
     borderWidth: 1,
-    borderColor: 'rgba(148,163,184,0.2)',
-    alignItems: 'center'
+    borderColor: 'rgba(148,163,184,0.2)'
   },
   title: {
     color: '#f8fafc',
     fontSize: 24,
+    lineHeight: 30,
     fontWeight: '800',
-    marginBottom: 4
-  },
-  subtitle: {
-    color: '#cbd5f5',
-    fontSize: 14,
-    marginBottom: 20
+    textAlign: 'center',
+    marginBottom: 8
   },
   buttonPrimary: {
-    width: '100%',
-    paddingVertical: 12,
+    minHeight: 44,
+    minWidth: 44,
+    paddingVertical: 10,
     borderRadius: 999,
     backgroundColor: '#22c55e',
     alignItems: 'center',
-    marginBottom: 12
+    justifyContent: 'center',
+    marginBottom: 4
   },
   buttonPrimaryText: {
     color: '#020617',
     fontSize: 16,
+    lineHeight: 20,
     fontWeight: '700'
   },
-  buttonSecondary: {
-    width: '100%',
-    paddingVertical: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#38bdf8',
+  sectionHeading: {
+    color: '#cbd5f5',
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+    marginTop: 8,
+    marginBottom: 2
+  },
+  controlRow: {
+    minHeight: 44,
+    minWidth: 44,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(148,163,184,0.2)'
   },
-  buttonSecondaryText: {
+  controlLabel: {
+    flex: 1,
     color: '#38bdf8',
-    fontSize: 16,
-    fontWeight: '600'
+    fontSize: 15,
+    lineHeight: 20
   },
-  section: {
-    width: '100%',
-    marginBottom: 12,
-    alignItems: 'center'
+  controlValue: {
+    minWidth: 48,
+    flexShrink: 0,
+    marginLeft: 8,
+    color: '#e2e8f0',
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '600',
+    textAlign: 'right'
   },
-  sectionLabel: {
+  valueRow: {
+    minHeight: 44,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    columnGap: 8,
+    rowGap: 2,
+    marginTop: 4
+  },
+  valueLabel: {
+    flexBasis: 112,
+    flexGrow: 1,
+    flexShrink: 1,
     color: '#38bdf8',
-    fontSize: 14,
-    marginBottom: 6
+    fontSize: 15,
+    lineHeight: 20
   },
-  sensitivityRow: {
+  stepper: {
+    minWidth: 160,
+    flexGrow: 1,
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12
+    gap: 4
   },
-  sensitivityValue: {
+  numericValue: {
+    minWidth: 64,
+    flexShrink: 0,
     color: '#f8fafc',
     fontSize: 18,
+    lineHeight: 24,
     fontWeight: '700',
-    width: 28,
-    textAlign: 'center'
+    textAlign: 'center',
+    fontVariant: ['tabular-nums']
   },
   adjustButton: {
-    width: 42,
-    height: 42,
+    minWidth: 44,
+    minHeight: 44,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: 'rgba(148,163,184,0.6)',
@@ -250,31 +277,22 @@ const styles = StyleSheet.create({
   adjustButtonText: {
     color: '#e2e8f0',
     fontSize: 20,
+    lineHeight: 24,
     fontWeight: '700'
   },
   exitButton: {
-    marginTop: 8
+    minWidth: 44,
+    minHeight: 44,
+    marginTop: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   exitButtonText: {
     color: '#f87171',
-    fontSize: 14,
+    fontSize: 15,
+    lineHeight: 20,
     textDecorationLine: 'underline'
-  },
-  legalLinks: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 16,
-    gap: 8
-  },
-  legalLinkText: {
-    color: '#38bdf8',
-    fontSize: 12,
-    textDecorationLine: 'underline'
-  },
-  legalLinkSeparator: {
-    color: 'rgba(148,163,184,0.5)',
-    fontSize: 12
   }
 });
 

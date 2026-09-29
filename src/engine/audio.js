@@ -65,6 +65,10 @@ const audioState = {
 };
 let pendingMusicPause = null;
 
+// Track gain is playback-only: retain the user's unscaled saved preference.
+export const MENU_MUSIC_MULTIPLIER = 0.25;
+const musicPlaybackVolume = trackName => audioState.musicVolume * (trackName === 'menu' ? MENU_MUSIC_MULTIPLIER : 1);
+
 // Sound effect definitions with priority
 // Priority 1: Critical (needed immediately for gameplay)
 // Priority 2: Important (needed during gameplay)
@@ -369,7 +373,7 @@ export async function playMusic(trackName, loop = true) {
     // Load and play new track
     const { sound } = await Audio.Sound.createAsync(
       musicFile,
-      { shouldPlay: true, isLooping: loop, volume: audioState.musicVolume }
+      { shouldPlay: true, isLooping: loop, volume: musicPlaybackVolume(trackName) }
     );
     audioState.music = sound;
     audioState.currentTrack = trackName;
@@ -431,9 +435,10 @@ export async function pauseMusic() {
  * Resume background music
  */
 export async function resumeMusic() {
-  if (!audioState.music) return;
+  if (!audioState.music || !audioState.musicEnabled) return;
 
   try {
+    await audioState.music.setVolumeAsync(musicPlaybackVolume(audioState.currentTrack));
     await audioState.music.playAsync();
     audioState.musicPaused = false;
   } catch (error) {
@@ -465,7 +470,7 @@ export async function setMusicVolume(volume) {
   
   if (audioState.music) {
     try {
-      await audioState.music.setVolumeAsync(audioState.musicVolume);
+      await audioState.music.setVolumeAsync(musicPlaybackVolume(audioState.currentTrack));
     } catch (error) {
       console.warn('Failed to set music volume:', error);
     }

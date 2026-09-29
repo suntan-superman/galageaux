@@ -89,16 +89,18 @@ export function calculateEnemyBulletSpeed(baseSpeed, level) {
  * Calculate enemy fire cooldown
  * @param {number} level - Current level
  * @param {string} enemyType - Type of enemy
+ * @param {function} random - Random source shared with the simulation
+ * @param {number} cooldownMultiplier - Optional opening pacing adjustment
  * @returns {number} Fire cooldown in seconds
  */
-export function calculateEnemyFireCooldown(level, enemyType = 'grunt') {
+export function calculateEnemyFireCooldown(level, enemyType = 'grunt', random = Math.random, cooldownMultiplier = 1) {
   if (enemyType === 'elite') {
-    return 0.4 + Math.random() * 0.3; // 0.4-0.7s (much faster)
+    return (0.4 + random() * 0.3) * cooldownMultiplier;
   }
   
   const baseCooldown = level <= 2 ? 2.5 : level <= 4 ? 1.8 : 1.2;
   const randomVariation = level <= 2 ? 1.5 : level <= 4 ? 1.2 : 1.3;
-  return baseCooldown + Math.random() * randomVariation;
+  return (baseCooldown + random() * randomVariation) * cooldownMultiplier;
 }
 
 /**
@@ -132,11 +134,18 @@ export function getComboColor(comboCount) {
  * @returns {Object} All difficulty settings
  */
 export function calculateDifficultySettings(stageConfig, level, inBonusRound = false) {
+  // Only stages/levels with an explicit profile get opening pacing. The base
+  // formulas and later-stage identities remain unchanged, including bonuses.
+  const opening = stageConfig.openingPacing?.[level];
+  const maxEnemies = calculateMaxEnemies(stageConfig.maxEnemies, level, inBonusRound);
   return {
-    spawnInterval: calculateSpawnInterval(stageConfig.spawnInterval, level, inBonusRound),
-    maxEnemies: calculateMaxEnemies(stageConfig.maxEnemies, level, inBonusRound),
-    enemySpeed: calculateEnemySpeed(stageConfig.enemySpeed, level, inBonusRound),
+    spawnInterval: calculateSpawnInterval(stageConfig.spawnInterval, level, inBonusRound) * (opening?.spawnIntervalMultiplier ?? 1),
+    maxEnemies: opening ? Math.min(maxEnemies, opening.residentCap + (inBonusRound ? 3 : 0)) : maxEnemies,
+    enemySpeed: calculateEnemySpeed(stageConfig.enemySpeed, level, inBonusRound) * (opening?.enemySpeedMultiplier ?? 1),
     enemyBulletSpeed: calculateEnemyBulletSpeed(stageConfig.enemyBulletSpeed, level),
+    enemyFireCooldownMultiplier: opening?.enemyFireCooldownMultiplier ?? 1,
+    formationChance: opening?.formationChance ?? 0.6,
+    formationSize: opening?.formationSize ?? 5,
     levelTarget: getLevelTarget(level),
     difficultyMultiplier: getDifficultyMultiplier(level),
     bonusMultiplier: inBonusRound ? 1.5 : 1
