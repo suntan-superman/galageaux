@@ -4,8 +4,12 @@
  */
 
 import React from 'react';
-import { Group, Circle, Rect } from '@shopify/react-native-skia';
-import { getPowerupColor } from '../../engine/powerups';
+import { Group, Circle, Rect, RadialGradient, vec } from '@shopify/react-native-skia';
+import { GAMEPLAY } from '../../constants/game';
+import { PALETTE, EFFECTS } from '../../constants/visualTheme';
+import { getExplosionVisual, getParticleVisual } from '../../engine/effectVisuals';
+
+export { default as Powerups } from './Powerups';
 
 /**
  * Screen flash effect for big explosions
@@ -34,7 +38,6 @@ export function ScreenFlash({ flash, width, height }) {
     />
   );
 }
-
 /**
  * Explosion effects with shockwave
  * @param {Object} props
@@ -45,37 +48,31 @@ export function ScreenFlash({ flash, width, height }) {
 export function Explosions({ explosions, ox, oy }) {
   return (
     <>
-      {explosions.map((ex, i) => {
+      {explosions.slice(-GAMEPLAY.MAX_EXPLOSIONS).map((ex, i) => {
         if (!ex || ex.life <= 0) return null;
-        const progress = 1 - (ex.life / ex.maxLife);
-        const alpha = 0.85 * (1 - progress);
-        const outerAlpha = 0.5 * (1 - progress);
-        
-        // Parse color or use default
-        const explosionColor = ex.color || '#fbbf24';
+        const visual = getExplosionVisual(ex);
+        const x = ex.x + ox, y = ex.y + oy;
+        const color = ex.color || PALETTE.hostile;
         
         return (
-          <Group key={`ex-${i}`}>
-            {/* Outer shockwave */}
+          <Group key={ex.id || `ex-${i}`}>
+            {/* Local energy release; no opaque expanding disk. */}
             <Circle
-              cx={ex.x + ox}
-              cy={ex.y + oy}
-              r={ex.radius * 1.5}
-              color={`rgba(248,250,252,${outerAlpha * 0.3})`}
-            />
-            {/* Main explosion with color */}
+              cx={x} cy={y} r={visual.energyRadius}
+              opacity={visual.energyAlpha * EFFECTS.glow}
+            >
+              <RadialGradient c={vec(x, y)} r={visual.energyRadius} colors={[color, `${color}55`, `${color}00`]} positions={[0, 0.4, 1]} />
+            </Circle>
+            {/* Thin, fast-fading shockwave retains the existing lifetime/budget. */}
             <Circle
-              cx={ex.x + ox}
-              cy={ex.y + oy}
-              r={ex.radius}
-              color={`${explosionColor}${Math.floor(alpha * 255).toString(16).padStart(2, '0')}`}
+              cx={x} cy={y} r={visual.radius}
+              style="stroke" strokeWidth={visual.ringWidth}
+              color={color} opacity={visual.ringAlpha}
             />
             {/* Inner bright core */}
             <Circle
-              cx={ex.x + ox}
-              cy={ex.y + oy}
-              r={ex.radius * 0.5}
-              color={`rgba(248,250,252,${alpha})`}
+              cx={x} cy={y} r={visual.coreRadius}
+              color={PALETTE.core} opacity={visual.coreAlpha}
             />
           </Group>
         );
@@ -94,48 +91,28 @@ export function Explosions({ explosions, ox, oy }) {
 export function Particles({ particles, ox, oy }) {
   return (
     <>
-      {particles.map((p, i) => (
-        <Circle 
-          key={`p-${i}`} 
-          cx={p.x + ox} 
-          cy={p.y + oy} 
-          r={p.radius} 
-          color={p.color || "rgba(248,250,252,0.8)"} 
-        />
-      ))}
-    </>
-  );
-}
-
-/**
- * Powerup items
- * @param {Object} props
- * @param {Object[]} props.powerups - Array of powerup objects
- * @param {number} props.ox - Screen offset X
- * @param {number} props.oy - Screen offset Y
- */
-export function Powerups({ powerups, ox, oy }) {
-  return (
-    <>
-      {powerups.map((p, i) => {
-        const px = p.x + p.size / 2 + ox;
-        const py = p.y + p.size / 2 + oy;
-        return (
-          <Group key={`pw-${i}`}>
-            <Circle
-              cx={px}
-              cy={py}
-              r={p.size / 2 + 2}
-              color="rgba(30,41,59,0.5)"
-            />
-            <Circle
-              cx={px}
-              cy={py}
-              r={p.size / 2}
-              color={p.kind === 'shield' ? '#a855f7' : p.kind === 'slow' ? '#f97316' : getPowerupColor(p.kind)}
-            />
-          </Group>
-        );
+      {particles.slice(-GAMEPLAY.MAX_PARTICLES).map((p, i) => {
+        if (!p || p.life <= 0) return null;
+        const visual = getParticleVisual(p);
+        const x = p.x + ox, y = p.y + oy;
+        const key = p.id || `p-${i}`;
+        if (visual.kind === 'fragment' || visual.kind === 'spark') {
+          return (
+            <Group key={key} origin={vec(x, y)} transform={[{ rotate: visual.rotation }]} opacity={visual.opacity}>
+              <Rect x={x - visual.width / 2} y={y - visual.height / 2} width={visual.width} height={visual.height} color={visual.color} />
+              {visual.kind === 'fragment' && <Rect x={x - visual.width / 2} y={y - visual.height / 2} width={visual.width} height={0.6} color={PALETTE.core} opacity={0.5} />}
+            </Group>
+          );
+        }
+        if (visual.kind === 'ring') {
+          return (
+            <Group key={key} opacity={visual.opacity}>
+              <Circle cx={x} cy={y} r={visual.radius} style="stroke" strokeWidth={4} color={visual.color} opacity={0.12 * EFFECTS.glow} />
+              <Circle cx={x} cy={y} r={visual.radius} style="stroke" strokeWidth={1.2} color={visual.color} opacity={0.8} />
+            </Group>
+          );
+        }
+        return <Circle key={key} cx={x} cy={y} r={visual.radius} color={visual.color} opacity={visual.opacity * (visual.kind === 'energy' ? 0.72 : 1)} />;
       })}
     </>
   );

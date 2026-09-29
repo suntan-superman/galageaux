@@ -12,7 +12,7 @@ import { createBoss, updateBoss, bossCurrentPattern } from './boss';
 import { generateBossBullets } from './boss-patterns';
 import { checkBulletEnemyCollisions, checkBulletBossCollisions, checkEnemyBulletPlayerCollisions, checkPowerupCollisions } from './collisionHandlers';
 import { createPowerup, updatePowerup, POWERUP_DURATION } from './powerups';
-import { spawnExplosion, spawnExplosionParticles, updateParticles, updateExplosion } from './particles';
+import { spawnExplosion, spawnExplosionParticles, spawnShieldRipple, updateParticles, updateExplosion } from './particles';
 import { createScreenshake, triggerScreenshake, updateScreenshake } from './screenshake';
 import { applyAllLimits } from './entityLimits';
 
@@ -112,6 +112,7 @@ function damagePlayer(state, events) {
   const x = state.player.x + state.player.width / 2, y = state.player.y + state.player.height / 2;
   if (state.player.shield) {
     state.player.shield = false; state.timers.shield = 0;
+    state.particles.push(...spawnShieldRipple(x, y, state.player.width * 0.65));
     popup(state, x, y - 30, 'Shield Saved!', '#38bdf8');
     emit(state, events, 'shieldHit'); return;
   }
@@ -249,7 +250,7 @@ function advance(state, dt, input, events, random) {
   });
   state.bullets = enemyResult.survivingBullets; state.enemies = enemyResult.survivingEnemies;
   mergeCollisionEffects(state, enemyResult.results);
-  if (enemyResult.results.killsEarned) triggerScreenshake(state.shake, 4.5, 0.15);
+  if (enemyResult.results.killsEarned) triggerScreenshake(state.shake, enemyResult.results.maxDestroyedSize >= 30 ? 6 : 4.5, 0.15);
   if (state.boss?.alive) {
     const result = checkBulletBossCollisions(state.bullets, state.boss, state.shake);
     state.bullets = result.survivingBullets; state.boss = result.updatedBoss; mergeCollisionEffects(state, result.results);

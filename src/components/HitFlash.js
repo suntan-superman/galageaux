@@ -4,6 +4,7 @@
 
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
+import { PALETTE, PRESENTATION } from '../constants/visualTheme';
 
 /**
  * @typedef {Object} HitFlashProps
@@ -15,7 +16,7 @@ export default function HitFlash({ intensity }) {
 
   return (
     <View 
-      style={[styles.flash, { opacity: intensity }]} 
+      style={[styles.flash, { opacity: Math.max(0, Math.min(1, intensity)) * PRESENTATION.damageTintOpacity }]}
       pointerEvents="none" 
     />
   );
@@ -28,6 +29,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(248,113,113,0.25)'
+    backgroundColor: PALETTE.damage
   }
 });

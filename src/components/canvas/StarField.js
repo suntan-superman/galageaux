@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { Group, Circle } from '@shopify/react-native-skia';
+import { getStarVisuals } from '../../engine/sceneVisuals';
 
 /**
  * @typedef {Object} Star
@@ -24,24 +25,20 @@ import { Group, Circle } from '@shopify/react-native-skia';
  * @param {number} props.ox - Screen offset X
  * @param {number} props.oy - Screen offset Y
  */
-export default function StarField({ stars, ox, oy }) {
+export default function StarField({ stars, time = 0, ox = 0, oy = 0 }) {
   return (
     <>
       {stars.map(star => {
-        const twinkle = Math.sin(Date.now() * 0.001 * (star.twinkleSpeed || 1) + (star.twinkleOffset || 0));
-        const alpha = star.layer === 'far' ? 0.2 + 0.15 * twinkle : 
-                      star.layer === 'mid' ? 0.4 + 0.25 * twinkle : 
-                      0.6 + 0.35 * twinkle;
-        const pulseSize = star.layer === 'near' ? star.size * (1 + twinkle * 0.15) : star.size;
+        const { alpha, size: pulseSize, glow, glowAlpha } = getStarVisuals(star, time);
         
         return (
           <Group key={star.id}>
-            {star.layer === 'near' && (
+            {glow && (
               <Circle
                 cx={star.x + ox}
                 cy={star.y + oy}
                 r={pulseSize * 2}
-                color={`rgba(${star.color},${alpha * 0.2})`}
+                color={`rgba(${star.color},${glowAlpha})`}
               />
             )}
             <Circle

@@ -4,7 +4,8 @@
  */
 
 import React from 'react';
-import { Rect, Circle } from '@shopify/react-native-skia';
+import { Rect, Circle, LinearGradient, RadialGradient, vec } from '@shopify/react-native-skia';
+import { getStageTheme, getNebulaVisuals } from '../../engine/sceneVisuals';
 
 /**
  * @param {Object} props
@@ -12,31 +13,23 @@ import { Rect, Circle } from '@shopify/react-native-skia';
  * @param {number} props.height - Screen height
  * @param {number} props.ox - Screen offset X
  * @param {number} props.oy - Screen offset Y
- * @param {number} props.nebulaPulse - First nebula alpha pulse value
- * @param {number} props.nebulaPulseAlt - Second nebula alpha pulse value
+ * @param {string} props.stage - Active stage palette
+ * @param {number} props.time - Shared presentation seconds
  */
-export default function Background({ width, height, ox, oy, nebulaPulse, nebulaPulseAlt }) {
+export default function Background({ width, height, stage = 'stage1', time = 0, ox = 0, oy = 0 }) {
+  const theme = getStageTheme(stage);
   return (
     <>
-      {/* Dark space background */}
-      <Rect x={ox} y={oy} width={width} height={height} color="#010314" />
-      
-      {/* Gradient overlay */}
-      <Rect x={ox} y={oy} width={width} height={height * 0.65} color="rgba(15,23,42,0.75)" />
-      
-      {/* Animated nebula clouds */}
-      <Circle 
-        cx={width * 0.3 + ox} 
-        cy={height * 0.25 + oy} 
-        r={220} 
-        color={`rgba(14,165,233,${nebulaPulse})`} 
-      />
-      <Circle 
-        cx={width * 0.72 + ox} 
-        cy={height * 0.18 + oy} 
-        r={190} 
-        color={`rgba(244,114,182,${nebulaPulseAlt})`} 
-      />
+      {/* Fixed full coverage: camera shake must never expose canvas edges. */}
+      <Rect x={0} y={0} width={width} height={height}>
+        <LinearGradient start={vec(0, 0)} end={vec(0, height)} colors={theme.space} positions={[0, 0.48, 1]} />
+      </Rect>
+      {getNebulaVisuals(stage, width, height, time).map((nebula, index) => (
+        <Circle key={`nebula-${index}`} cx={nebula.x + ox} cy={nebula.y + oy} r={nebula.radius} opacity={nebula.opacity}>
+          <RadialGradient c={vec(nebula.x + ox, nebula.y + oy)} r={nebula.radius}
+            colors={[nebula.color, `${nebula.color}80`, `${nebula.color}00`]} positions={[0, 0.42, 1]} />
+        </Circle>
+      ))}
     </>
   );
 }

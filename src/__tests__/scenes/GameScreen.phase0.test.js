@@ -14,7 +14,8 @@ jest.mock('react-native', () => ({
   AppState: { currentState: 'active', addEventListener: jest.fn(() => ({ remove: jest.fn() })) },
 }));
 jest.mock('@react-native-async-storage/async-storage', () => ({ getItem: jest.fn(async () => null), setItem: jest.fn(async () => {}) }));
-jest.mock('@shopify/react-native-skia', () => ({ Canvas: 'Canvas' }));
+jest.mock('@shopify/react-native-skia', () => ({ Canvas: 'Canvas', Group: 'Group' }));
+jest.mock('../../components/BossHealthBar', () => 'BossHealthBar');
 jest.mock('../../components/canvas', () => Object.fromEntries(['Background', 'StarField', 'PlayerShip', 'Enemies', 'BossShip', 'PlayerBullets', 'EnemyBullets', 'MuzzleFlashes', 'Explosions', 'Particles', 'Powerups'].map(name => [name, name])));
 jest.mock('../../components/PauseOverlay', () => 'PauseOverlay');
 jest.mock('../../components/ControlHintsOverlay', () => 'ControlHintsOverlay');
@@ -33,7 +34,9 @@ jest.mock('../../engine/achievements', () => ({
 }));
 jest.mock('../../hooks/useGameSettings', () => () => ({ tiltSensitivity: 1.5, fireButtonPosition: 'right', audioSettings: {}, loaded: true }));
 jest.mock('../../hooks/useStarField', () => () => ({ stars: [], updateStars: jest.fn(), resetStars: jest.fn() }));
-jest.mock('../../hooks/usePlayerControls', () => () => ({ panHandlers: {}, updateTilt: () => null }));
+jest.mock('../../hooks/usePlayerControls', () => ({ onPositionChange }) => ({
+  panHandlers: { onTestMove: onPositionChange }, updateTilt: () => null,
+}));
 import GameScreen from '../../scenes/GameScreen';
 
 describe('mounted production GameScreen frame contract', () => {
@@ -195,5 +198,52 @@ describe('mounted production GameScreen frame contract', () => {
     expect(subscription.remove).toHaveBeenCalledTimes(1);
     // React's own scheduled jobs are not gameplay-owned timers.
     expect(clearSpy).toHaveBeenCalledWith(toastTimer);
+  });
+
+  it('Phase 1: touch movement is immediate and bank alone eases on the next frame', async () => {
+    await mount(false); await frame(16); await frame(16);
+    const x = props('PlayerShip').player.x;
+    await act(async () => props('View').onTestMove(x + 25));
+    expect(props('PlayerShip').player.x).toBe(x + 25);
+    expect(props('PlayerShip').bank).toBe(0);
+    await frame(16);
+    const bank = props('PlayerShip').bank;
+    expect(bank).toBeGreaterThan(0);
+    await frame(16);
+    expect(props('PlayerShip').velocityX).toBe(0);
+    expect(props('PlayerShip').bank).toBeLessThan(bank);
+    expect(props('PlayerShip').player.x).toBe(x + 25);
+    await act(async () => props('View').onTestMove(x - 25));
+    await frame(16);
+    expect(props('PlayerShip').bank).toBeLessThan(bank);
+  });
+  it('Phase 1: decorative time is shared, frozen on pause and reset on retry', async () => {
+    await mount(false); await advance(0.2);
+    const time = props('PlayerShip').time;
+    expect(time).toBeGreaterThan(0);
+    for (const name of ['Background', 'StarField', 'Powerups']) expect(props(name).time).toBe(time);
+    await act(async () => props('GameHUD').onPauseToggle());
+    await advance(2);
+    expect(props('PlayerShip').time).toBe(time);
+    await act(async () => props('StageCompleteOverlay').onRetry());
+    expect(props('PlayerShip').time).toBe(0);
+    expect(props('PlayerShip').bank).toBe(0);
+  });
+  it('Phase 1: applies one world shake while keeping the boss health bar screen-fixed', async () => {
+    const seed = Simulation.createGameSession(400, 800);
+    seed.screenOffset = { ox: 10, oy: -6 };
+    seed.boss = { alive: true, hp: 80, maxHp: 100 };
+    jest.spyOn(Simulation, 'createGameSession').mockReturnValueOnce(seed);
+    await mount(false);
+    expect(props('Group').transform).toEqual([{ translateX: 4.5 }, { translateY: -2.7 }]);
+    for (const name of ['PlayerShip', 'Enemies', 'BossShip', 'Particles', 'Explosions', 'PlayerBullets', 'EnemyBullets', 'Powerups']) {
+      expect(props(name)).toMatchObject({ ox: 0, oy: 0 });
+    }
+    expect(props('ScorePopup')).toMatchObject({ offsetX: 4.5, offsetY: -2.7 });
+    expect(screen.root.findByType('BossHealthBar').parent.type).toBe('Canvas');
+    expect(props('BossHealthBar')).toMatchObject({ x: 100, y: 112, health: 80 });
+    expect(screen.root.findByType('Background').parent.type).toBe('Canvas');
+    const world = screen.root.findByType('Group');
+    expect(world.children[world.children.length - 1].type).toBe('EnemyBullets');
   });
 });

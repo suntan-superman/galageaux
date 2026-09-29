@@ -4,6 +4,9 @@
  * @module engine/particles
  */
 
+import { IMPACT_VISUALS } from './effectVisuals';
+import { PALETTE } from '../constants/visualTheme';
+
 /**
  * @typedef {Object} Particle
  * @property {number} x - X position
@@ -36,10 +39,13 @@ const COLOR_SCHEMES = {
 
 // Keep the existing 60 Hz spark velocity decay, expressed per elapsed second.
 const SPARK_DRAG_RATE = -60 * Math.log(0.98);
+// Separate from gameplay entity IDs and RNG, retained by immutable updates.
+let effectSequence = 0;
 
 function createParticle(particle) {
   return {
     ...particle,
+    id: particle.id ?? `fx-p-${++effectSequence}`,
     maxLife: particle.life,
     initialRadius: particle.radius,
   };
@@ -314,6 +320,7 @@ export function getScreenFlashAlpha(flash) {
 
 export function spawnExplosion(x, y, radius = 26, life = 0.25, color = '#fbbf24') {
   return {
+    id: `fx-ex-${++effectSequence}`,
     x,
     y,
     radius: 0,
@@ -324,6 +331,47 @@ export function spawnExplosion(x, y, radius = 26, life = 0.25, color = '#fbbf24'
     color,
     shockwave: true
   };
+}
+
+/** Brief contact + a small reflected fan. Existing boss samples can be reused. */
+export function spawnContactParticles(x, y, {
+  vx = 0, vy = -1, target = 'enemy', targetId, legacyParticles = null,
+} = {}) {
+  const count = legacyParticles?.length || 4;
+  const heading = Math.hypot(vx, vy) > 0 ? Math.atan2(-vy, -vx) : Math.PI / 2;
+  return Array.from({ length: count }, (_, index) => {
+    const core = index === 0;
+    const spread = count > 2 ? ((index - 1) / (count - 2) - 0.5) * 1.4 : 0;
+    const angle = heading + spread;
+    const speed = 65 + (index % 3) * 12;
+    return createParticle({
+      ...legacyParticles?.[index], x, y, target, targetId,
+      vx: core ? 0 : Math.cos(angle) * speed,
+      vy: core ? 0 : Math.sin(angle) * speed,
+      life: core ? IMPACT_VISUALS.contactLife : IMPACT_VISUALS.sparkLife - (index % 2) * 0.02,
+      radius: core ? IMPACT_VISUALS.contactRadius : 1,
+      type: core ? 'contact' : 'contactSpark',
+      color: core ? PALETTE.core : target === 'boss' ? PALETTE.boss : PALETTE.friendly,
+      rotation: 0, rotationSpeed: 0,
+    });
+  });
+}
+
+/** One expanding boundary plus four faint dispersal streaks, all in the shared budget. */
+export function spawnShieldRipple(x, y, radius = 26) {
+  const ripple = createParticle({
+    x, y, vx: 0, vy: 0, radius, maxRadius: radius + 12,
+    life: IMPACT_VISUALS.shieldLife, type: 'shieldRipple', color: PALETTE.shield,
+  });
+  const dispersion = Array.from({ length: 4 }, (_, index) => {
+    const angle = Math.PI / 4 + index * Math.PI / 2;
+    return createParticle({
+      x: x + Math.cos(angle) * radius, y: y + Math.sin(angle) * radius,
+      vx: Math.cos(angle) * 42, vy: Math.sin(angle) * 42,
+      radius: 0.9, life: 0.16, type: 'contactSpark', color: PALETTE.shield,
+    });
+  });
+  return [ripple, ...dispersion];
 }
 
 export function updateExplosion(explosion, dt) {

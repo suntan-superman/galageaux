@@ -1,86 +1,33 @@
-/**
- * Enemies - Skia Canvas component for enemy rendering
- * Renders different enemy types with appropriate glows and details
- */
-
+/** Familiar arcade bodies with restrained armor, type accents and local hit light. */
 import React from 'react';
-import { Group, Circle, Rect } from '@shopify/react-native-skia';
+import { Group, Circle, Rect, Path, LinearGradient, vec } from '@shopify/react-native-skia';
 import enemiesConfig from '../../config/enemies.json';
+import { PALETTE, EFFECTS } from '../../constants/visualTheme';
 
-/**
- * Get glow color based on enemy type
- * @param {string} type - Enemy type
- * @returns {string} RGBA color string
- */
-function getEnemyGlow(type) {
-  switch (type) {
-    case 'shooter': return 'rgba(249,115,22,0.3)'; // orange
-    case 'dive': return 'rgba(34,197,94,0.3)'; // green
-    case 'scout': return 'rgba(168,85,247,0.3)'; // purple
-    case 'tank': return 'rgba(239,68,68,0.4)'; // red (stronger)
-    case 'elite': return 'rgba(251,191,36,0.4)'; // gold (stronger)
-    case 'kamikaze': return 'rgba(236,72,153,0.3)'; // pink
-    default: return 'rgba(56,189,248,0.3)'; // blue
-  }
-}
+// Unit-square local geometry is reused at every configured enemy size. No bank,
+// animation path or presentation position feeds back into the simulation.
+const ARMOR = 'M .18 0 L .82 0 L 1 .18 L 1 .82 L .82 1 L .18 1 L 0 .82 L 0 .18 Z';
+const SCOUT = 'M .5 0 L 1 .42 L .82 .85 L .5 1 L .18 .85 L 0 .42 Z';
+const DIVE = 'M 0 0 L .3 .12 L .5 0 L .7 .12 L 1 0 L .92 .8 L .5 1 L .08 .8 Z';
+const MATERIAL = ['#314962', PALETTE.metal, '#0a1423'];
+const TOP = vec(0, 0), BOTTOM = vec(0, 1);
 
-/**
- * Renders all enemies with type-specific styling
- * @param {Object} props
- * @param {Object[]} props.enemies - Array of enemy objects
- * @param {number} props.ox - Screen offset X
- * @param {number} props.oy - Screen offset Y
- */
-export default function Enemies({ enemies, ox, oy }) {
-  return (
-    <>
-      {enemies.map((e, i) => {
-        const enemyCenterX = e.x + e.size / 2 + ox;
-        const enemyCenterY = e.y + e.size / 2 + oy;
-        const enemyColor = enemiesConfig[e.type]?.color || '#38bdf8';
-        const enemyGlow = getEnemyGlow(e.type);
-        
-        return (
-          <Group key={`e-${i}`}>
-            {/* Outer glow */}
-            <Circle cx={enemyCenterX} cy={enemyCenterY} r={e.size / 2 + 8} color="rgba(15,23,42,0.6)" />
-            <Circle cx={enemyCenterX} cy={enemyCenterY} r={e.size / 2 + 4} color={enemyGlow} />
-            
-            {/* Enemy body with pattern */}
-            <Rect x={e.x + ox} y={e.y + oy} width={e.size} height={e.size} color={enemyColor} />
-            
-            {/* Inner detail - crosshair pattern for shooters */}
-            {e.canShoot && (
-              <>
-                <Rect 
-                  x={enemyCenterX - e.size * 0.15} 
-                  y={enemyCenterY - e.size * 0.4} 
-                  width={e.size * 0.3} 
-                  height={e.size * 0.8} 
-                  color="rgba(248,250,252,0.4)" 
-                />
-                <Rect 
-                  x={enemyCenterX - e.size * 0.4} 
-                  y={enemyCenterY - e.size * 0.15} 
-                  width={e.size * 0.8} 
-                  height={e.size * 0.3} 
-                  color="rgba(248,250,252,0.4)" 
-                />
-              </>
-            )}
-            
-            {/* Center core */}
-            <Circle cx={enemyCenterX} cy={enemyCenterY} r={e.size * 0.15} color="rgba(248,250,252,0.6)" />
-            <Circle cx={enemyCenterX} cy={enemyCenterY} r={e.size * 0.08} color="rgba(15,23,42,0.8)" />
-            
-            {/* Corner accents */}
-            <Circle cx={e.x + ox + e.size * 0.2} cy={e.y + oy + e.size * 0.2} r={1.5} color="rgba(248,250,252,0.5)" />
-            <Circle cx={e.x + ox + e.size * 0.8} cy={e.y + oy + e.size * 0.2} r={1.5} color="rgba(248,250,252,0.5)" />
-            <Circle cx={e.x + ox + e.size * 0.2} cy={e.y + oy + e.size * 0.8} r={1.5} color="rgba(248,250,252,0.5)" />
-            <Circle cx={e.x + ox + e.size * 0.8} cy={e.y + oy + e.size * 0.8} r={1.5} color="rgba(248,250,252,0.5)" />
-          </Group>
-        );
-      })}
-    </>
-  );
+export default function Enemies({ enemies, ox = 0, oy = 0, hitFlashes = {} }) {
+  return <>{enemies.map(enemy => {
+    const size = enemy.size;
+    const color = enemiesConfig[enemy.type]?.color || PALETTE.hostile;
+    const path = enemy.type === 'scout' ? SCOUT : ['dive', 'kamikaze'].includes(enemy.type) ? DIVE : ARMOR;
+    const flash = Math.max(0, Math.min(1, hitFlashes[enemy.id] || 0)) * EFFECTS.impact;
+    return <Group key={enemy.id} transform={[{ translateX: enemy.x + ox }, { translateY: enemy.y + oy }, { scale: size }]}>
+      <Path path={path}><LinearGradient start={TOP} end={BOTTOM} colors={MATERIAL} /></Path>
+      <Path path={path} color={color} style="stroke" strokeWidth={1.2 / size} />
+      <Rect x={0.12} y={0.22} width={0.12} height={0.45} color={color} opacity={0.72} />
+      <Rect x={0.76} y={0.22} width={0.12} height={0.45} color={color} opacity={0.72} />
+      {enemy.canShoot && <Path path="M .34 .36 L .5 .55 L .66 .36 M .5 .55 L .5 .8"
+        color={PALETTE.hostile} style="stroke" strokeWidth={1.5 / size} />}
+      <Circle cx={0.5} cy={0.3} r={0.085} color={color} />
+      {enemy.type === 'tank' && <Rect x={0.28} y={0.65} width={0.44} height={0.12} color={color} opacity={0.8} />}
+      {flash > 0 && <Path path={path} color={PALETTE.core} opacity={flash * 0.8} />}
+    </Group>;
+  })}</>;
 }

@@ -4,9 +4,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { VISUAL } from '../constants/game';
-
-const STAR_COLORS = VISUAL.STAR_COLORS;
+import { STAR_COLORS, getStarVisuals } from '../engine/sceneVisuals';
 
 /**
  * @typedef {Object} Star
@@ -44,8 +42,22 @@ export function createStarField(width, height, count = 100) {
       color: STAR_COLORS[Math.floor(Math.random() * STAR_COLORS.length)],
       twinkleOffset: Math.random() * Math.PI * 2,
       twinkleSpeed: 0.5 + Math.random() * 2,
-      layer: layer < 0.3 ? 'far' : layer < 0.7 ? 'mid' : 'near'
+      layer: layer < 0.3 ? 'far' : layer < 0.7 ? 'mid' : 'near',
+      // Rare, stable glows without another random sample or more stars.
+      glow: layer >= 0.7 && idx % 11 === 0,
     };
+  });
+}
+
+export function advanceStarField(stars, dt, width, height, random = Math.random) {
+  return stars.map(star => {
+    let nextY = star.y + star.speed * dt;
+    let nextX = star.x;
+    if (nextY > height) {
+      nextY = -5;
+      nextX = random() * width;
+    }
+    return { ...star, y: nextY, x: nextX };
   });
 }
 
@@ -63,16 +75,7 @@ export default function useStarField(width, height, count = 100) {
    * @param {number} dt - Delta time in seconds
    */
   const updateStars = useCallback((dt) => {
-    setStars(prev => prev.map(star => {
-      let nextY = star.y + star.speed * dt;
-      let nextX = star.x;
-      if (nextY > height) {
-        nextY = -5;
-        nextX = Math.random() * width;
-      }
-      const twinkle = 0.5 + 0.5 * Math.sin((Date.now() / 600) + star.twinkleOffset);
-      return { ...star, y: nextY, x: nextX, twinkle };
-    }));
+    setStars(prev => advanceStarField(prev, dt, width, height));
   }, [width, height]);
 
   /**
@@ -81,20 +84,6 @@ export default function useStarField(width, height, count = 100) {
   const resetStars = useCallback(() => {
     setStars(createStarField(width, height, count));
   }, [width, height, count]);
-
-  /**
-   * Calculate star visual properties for rendering
-   * @param {Star} star - Star object
-   * @returns {{ alpha: number, size: number }} Visual properties
-   */
-  const getStarVisuals = useCallback((star) => {
-    const twinkle = Math.sin(Date.now() * 0.001 * (star.twinkleSpeed || 1) + (star.twinkleOffset || 0));
-    const alpha = star.layer === 'far' ? 0.2 + 0.15 * twinkle : 
-                  star.layer === 'mid' ? 0.4 + 0.25 * twinkle : 
-                  0.6 + 0.35 * twinkle;
-    const size = star.layer === 'near' ? star.size * (1 + twinkle * 0.15) : star.size;
-    return { alpha, size };
-  }, []);
 
   return {
     stars,

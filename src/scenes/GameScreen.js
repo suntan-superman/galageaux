@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AppState, View, StyleSheet, useWindowDimensions } from 'react-native';
-import { Canvas } from '@shopify/react-native-skia';
+import { Canvas, Group } from '@shopify/react-native-skia';
 import { createGameSession, commandGameSession, stepGameSession, isGameplayActive, MAX_FRAME_SECONDS } from '../engine/gameSimulation';
 import { getAchievementUpdates, playGameEventSounds } from '../engine/gameEventEffects';
 import { getLevelTarget } from '../engine/difficulty';
@@ -16,6 +16,8 @@ import LevelBanner from '../components/LevelBanner';
 import BonusBanner from '../components/BonusBanner';
 import StageCompleteOverlay from '../components/StageCompleteOverlay';
 import HitFlash from '../components/HitFlash';
+import BossHealthBar from '../components/BossHealthBar';
+import { createPresentationState, advancePresentation, getWorldOffset, getDamageFlash, getHitFlashes } from '../engine/presentation';
 import { Background, StarField, PlayerShip, Enemies, BossShip, PlayerBullets, EnemyBullets, MuzzleFlashes, Explosions, Particles, Powerups } from '../components/canvas';
 import GameOverOverlay from './GameOverOverlay';
 import { STAGES } from '../constants/game';
@@ -27,6 +29,8 @@ export default function GameScreen({ onExit, showTutorial = false }) {
   const { width, height } = useWindowDimensions();
   const sessionRef = useRef(null);
   if (!sessionRef.current) sessionRef.current = createGameSession(width, height, showTutorial);
+  const presentationRef = useRef(null);
+  if (!presentationRef.current) presentationRef.current = createPresentationState(sessionRef.current);
   const [snapshot, setSnapshot] = useState(sessionRef.current);
   const [tiltControlEnabled, setTiltControlEnabled] = useState(true);
   const [achievementToast, setAchievementToast] = useState(null);
@@ -76,9 +80,10 @@ export default function GameScreen({ onExit, showTutorial = false }) {
         }
       }).catch(error => console.warn('Achievement update failed:', error));
   };
-  const commit = result => {
+  const commit = (result, visualDt = 0) => {
     // Authority changes immediately; passive effects never mirror gameplay state.
     sessionRef.current = result.state;
+    presentationRef.current = advancePresentation(presentationRef.current, result.state, visualDt);
     setSnapshot(result.state);
     consumeEvents(result.events, result.state);
   };
@@ -94,9 +99,11 @@ export default function GameScreen({ onExit, showTutorial = false }) {
     const dt = Math.min(MAX_FRAME_SECONDS, Math.max(0, elapsed));
     if (isGameplayActive(state)) {
       const playerX = updateTilt(dt, state.player.x);
-      commit(stepGameSession({ ...state, width, height }, dt, { playerX }));
+      commit(stepGameSession({ ...state, width, height }, dt, { playerX }), dt);
       updateStars(dt);
-    } else if (state.phase === 'transition') commit(stepGameSession(state, dt));
+    } else if (state.phase === 'transition') {
+      commit(stepGameSession(state, dt), dt);
+    }
   };
 
   useEffect(() => {
@@ -149,6 +156,7 @@ export default function GameScreen({ onExit, showTutorial = false }) {
 
   const resetGame = () => {
     const fresh = createGameSession(width, height, false, sessionRef.current.sessionId + 1);
+    presentationRef.current = createPresentationState(fresh);
     sessionRef.current = fresh; setSnapshot(fresh);
     startedSession.current = fresh.sessionId;
     setAchievementToast(null); resetStars(); lastTimeRef.current = null;
@@ -164,51 +172,50 @@ export default function GameScreen({ onExit, showTutorial = false }) {
   const handleAutoToggle = () => command({ type: 'toggleAutoFire' });
   const fireWeapon = () => command({ type: 'fire' });
 
-  const { ox, oy } = snapshot.screenOffset;
+  const { ox, oy } = getWorldOffset(snapshot.screenOffset);
+  const presentation = presentationRef.current;
+  const hitFlashes = getHitFlashes(particles);
+  const damageFlash = getDamageFlash(playerHitFlash);
   const hudScale = 1 + hudPulse * 0.08;
-  const timestamp = Date.now();
-  const flameLength = 20 + Math.sin(timestamp / 120) * 8;
-  const flameWidth = 8 + Math.sin(timestamp / 80) * 2;
-  const nebulaPulse = 0.25 + 0.2 * Math.sin(timestamp / 1500);
-  const nebulaPulseAlt = 0.2 + 0.15 * Math.sin(timestamp / 1100 + 1);
   const fireButtonDisabled = !canFire || controlsStopped;
 
   return (
     <View style={styles.container} {...panHandlers}>
       <Canvas style={styles.canvas}>
-        <Background 
-          width={width} 
-          height={height} 
-          ox={ox} 
-          oy={oy} 
-          nebulaPulse={nebulaPulse} 
-          nebulaPulseAlt={nebulaPulseAlt} 
-        />
-        <StarField stars={stars} ox={ox} oy={oy} />
+        <Background width={width} height={height} stage={currentStage} time={presentation.time} />
+        {/* Shake is applied once to the world, never to authoritative coordinates.
+            The base background and HUD remain screen-fixed. */}
+        <Group transform={[{ translateX: ox }, { translateY: oy }]}>
+        <StarField stars={stars} ox={0} oy={0} time={presentation.time} />
         
         {player.alive && (
           <PlayerShip
             player={player}
-            ox={ox}
-            oy={oy}
-            flameLength={flameLength}
-            flameWidth={flameWidth}
+            ox={0}
+            oy={0}
+            bank={presentation.bank}
+            velocityX={presentation.velocityX}
+            time={presentation.time}
             inBonusRound={inBonusRound}
-            hitFlash={playerHitFlash}
+            hitFlash={damageFlash}
           />
         )}
 
-        <MuzzleFlashes flashes={muzzleFlashes} ox={ox} oy={oy} />
-        <PlayerBullets bullets={bullets} ox={ox} oy={oy} />
-        <EnemyBullets bullets={enemyBullets} ox={ox} oy={oy} />
-        <Enemies enemies={enemies} ox={ox} oy={oy} />
-        <BossShip boss={boss} ox={ox} oy={oy} screenWidth={width} />
-        <Explosions explosions={explosions} ox={ox} oy={oy} />
-        <Particles particles={particles} ox={ox} oy={oy} />
-        <Powerups powerups={powerups} ox={ox} oy={oy} />
+        <Enemies enemies={enemies} ox={0} oy={0} hitFlashes={hitFlashes.enemy} />
+        <BossShip boss={boss} ox={0} oy={0} screenWidth={width} hitFlash={hitFlashes.boss} showHealthBar={false} />
+        <Explosions explosions={explosions} ox={0} oy={0} />
+        <Particles particles={particles} ox={0} oy={0} />
+        <Powerups powerups={powerups} ox={0} oy={0} time={presentation.time} />
+        <MuzzleFlashes flashes={muzzleFlashes} ox={0} oy={0} />
+        <PlayerBullets bullets={bullets} ox={0} oy={0} rapidFire={player.rapidFire} />
+        {/* Threat cores stay above transient effects so patterns remain legible. */}
+        <EnemyBullets bullets={enemyBullets} ox={0} oy={0} />
+        </Group>
+        {boss?.alive && <BossHealthBar health={boss.hp} maxHealth={boss.maxHp}
+          trailingHealth={presentation.bossHealth} x={width / 2 - 100} y={112} width={200} height={10} />}
       </Canvas>
 
-      <HitFlash intensity={playerHitFlash} />
+      <HitFlash intensity={damageFlash} />
       <LevelBanner text={levelBanner} visible={!inBonusRound} />
       <BonusBanner visible={inBonusRound} timeLeft={bonusTimeLeft} />
 

@@ -1,39 +1,31 @@
-/**
- * Bullets - Skia Canvas components for bullet rendering
- * Includes player bullets and enemy bullets with trail effects
- */
-
 import React from 'react';
-import { Group, Circle, Rect } from '@shopify/react-native-skia';
+import { Group, Circle, Rect, Line, LinearGradient, RadialGradient, vec } from '@shopify/react-native-skia';
+import { PALETTE, EFFECTS } from '../../constants/visualTheme';
+import { getProjectileVisual } from '../../engine/shipVisuals';
 
-/**
- * Player bullet with glowing trail effect
- * @param {Object} props
- * @param {Object[]} props.bullets - Array of bullet objects
- * @param {number} props.ox - Screen offset X
- * @param {number} props.oy - Screen offset Y
- */
-export function PlayerBullets({ bullets, ox, oy }) {
+const ORIGIN = vec(0, 0);
+const FRIENDLY_CORE = [PALETTE.friendly, PALETTE.core, PALETTE.friendly];
+const HOSTILE_CORE = [PALETTE.hostileEdge, PALETTE.hostile, PALETTE.core, PALETTE.hostile, PALETTE.hostileEdge];
+
+/** AABB-aligned core plus a short velocity-aligned decorative streak. */
+export function PlayerBullets({ bullets, ox = 0, oy = 0, rapidFire = false }) {
   return (
     <>
-      {bullets.map((b, i) => {
-        const bulletCenterX = b.x + b.width / 2 + ox;
-        const bulletCenterY = b.y + b.height / 2 + oy;
+      {bullets.map((bullet, index) => {
+        const visual = getProjectileVisual(bullet);
+        const width = bullet.width ?? 4;
+        const height = bullet.height ?? 14;
         return (
-          <Group key={`pb-${i}`}>
-            {/* Extended bullet trail */}
-            <Circle cx={bulletCenterX} cy={bulletCenterY + 6} r={2.5} color="rgba(56,189,248,0.5)" />
-            <Circle cx={bulletCenterX} cy={bulletCenterY + 10} r={2} color="rgba(56,189,248,0.35)" />
-            <Circle cx={bulletCenterX} cy={bulletCenterY + 14} r={1.5} color="rgba(56,189,248,0.2)" />
-            <Circle cx={bulletCenterX} cy={bulletCenterY + 18} r={1} color="rgba(56,189,248,0.1)" />
-            {/* Outer glow */}
-            <Circle cx={bulletCenterX} cy={bulletCenterY} r={7} color="rgba(139,92,246,0.3)" />
-            <Circle cx={bulletCenterX} cy={bulletCenterY} r={5} color="rgba(56,189,248,0.4)" />
-            {/* Main bullet body */}
-            <Rect x={b.x + ox} y={b.y + oy} width={b.width} height={b.height} color="#f8fafc" />
-            {/* Energy core */}
-            <Circle cx={bulletCenterX} cy={bulletCenterY} r={3} color="rgba(56,189,248,0.95)" />
-            <Circle cx={bulletCenterX} cy={bulletCenterY} r={1.5} color="rgba(255,255,255,0.9)" />
+          <Group key={bullet.id ?? ('pb-' + index)} transform={[{ translateX: visual.center.x + ox }, { translateY: visual.center.y + oy }]}>
+            <Line p1={visual.tailStart} p2={visual.tailEnd} strokeWidth={Math.max(1, width * 0.65)} strokeCap="round" opacity={(rapidFire ? 0.25 : 0.42) * EFFECTS.glow}>
+              <LinearGradient start={visual.tailStart} end={visual.tailEnd} colors={[PALETTE.friendly, PALETTE.friendly + '00']} />
+            </Line>
+            <Circle cx={0} cy={0} r={4.5} opacity={(rapidFire ? 0.1 : 0.16) * EFFECTS.glow}>
+              <RadialGradient c={ORIGIN} r={4.5} colors={[PALETTE.friendly, PALETTE.friendly + '00']} />
+            </Circle>
+            <Rect x={-width / 2} y={-height / 2} width={width} height={height}>
+              <LinearGradient start={vec(-width / 2, 0)} end={vec(width / 2, 0)} colors={FRIENDLY_CORE} positions={[0, 0.5, 1]} />
+            </Rect>
           </Group>
         );
       })}
@@ -41,51 +33,46 @@ export function PlayerBullets({ bullets, ox, oy }) {
   );
 }
 
-/**
- * Enemy bullet with orange glow
- * @param {Object} props
- * @param {Object[]} props.bullets - Array of enemy bullet objects
- * @param {number} props.ox - Screen offset X
- * @param {number} props.oy - Screen offset Y
- */
-export function EnemyBullets({ bullets, ox, oy }) {
+/** Warm defined edges; radial/aimed volleys retain their original AABB core. */
+export function EnemyBullets({ bullets, ox = 0, oy = 0 }) {
   return (
     <>
-      {bullets.map((b, i) => (
-        <Group key={`eb-${i}`}>
-          <Circle cx={(b.x || 0) + b.width / 2 + ox} cy={(b.y || 0) + oy} r={5} color="rgba(249,115,22,0.25)" />
-          <Rect x={(b.x || 0) + ox} y={(b.y || 0) + oy} width={b.width} height={b.height} color="#fb923c" />
-        </Group>
-      ))}
+      {bullets.map((bullet, index) => {
+        const visual = getProjectileVisual(bullet, false);
+        const width = bullet.width ?? 4;
+        const height = bullet.height ?? 14;
+        return (
+          <Group key={bullet.id ?? ('eb-' + index)} transform={[{ translateX: visual.center.x + ox }, { translateY: visual.center.y + oy }]}>
+            <Line p1={visual.tailStart} p2={visual.tailEnd} strokeWidth={1.5} strokeCap="round" opacity={0.34 * EFFECTS.glow}>
+              <LinearGradient start={visual.tailStart} end={visual.tailEnd} colors={[PALETTE.hostile, PALETTE.hostile + '00']} />
+            </Line>
+            <Circle cx={0} cy={0} r={5} opacity={0.2 * EFFECTS.glow}>
+              <RadialGradient c={ORIGIN} r={5} colors={[PALETTE.hostile, PALETTE.hostile + '00']} />
+            </Circle>
+            <Rect x={-width / 2} y={-height / 2} width={width} height={height}>
+              <LinearGradient start={vec(-width / 2, 0)} end={vec(width / 2, 0)} colors={HOSTILE_CORE} positions={[0, 0.25, 0.5, 0.75, 1]} />
+            </Rect>
+          </Group>
+        );
+      })}
     </>
   );
 }
 
-/**
- * Muzzle flash effect at bullet spawn point
- * @param {Object} props
- * @param {Object[]} props.flashes - Array of muzzle flash objects
- * @param {number} props.ox - Screen offset X
- * @param {number} props.oy - Screen offset Y
- */
-export function MuzzleFlashes({ flashes, ox, oy }) {
+/** The existing 100ms muzzle lifetime, with three restrained cool layers. */
+export function MuzzleFlashes({ flashes, ox = 0, oy = 0 }) {
   return (
     <>
-      {flashes.map((mf, i) => {
-        const alpha = Math.max(0, mf.life / 0.1);
-        const scale = 1 + (1 - alpha) * 0.5; // Expanding effect
+      {flashes.map((flash, index) => {
+        const alpha = Math.max(0, Math.min(1, flash.life / 0.1));
+        const radius = 3 + (1 - alpha) * 4;
         return (
-          <Group key={`muzzle-${mf.id}`}>
-            {/* Outer blast wave */}
-            <Circle cx={mf.x + ox} cy={mf.y + oy} r={18 * alpha * scale} color={`rgba(248,250,252,${alpha * 0.3})`} />
-            {/* Bright flash */}
-            <Circle cx={mf.x + ox} cy={mf.y + oy} r={12 * alpha} color={`rgba(248,250,252,${alpha * 0.9})`} />
-            {/* Blue energy */}
-            <Circle cx={mf.x + ox} cy={mf.y + oy} r={8 * alpha} color={`rgba(56,189,248,${alpha})`} />
-            {/* Purple core */}
-            <Circle cx={mf.x + ox} cy={mf.y + oy} r={5 * alpha} color={`rgba(139,92,246,${alpha})`} />
-            {/* White hot center */}
-            <Circle cx={mf.x + ox} cy={mf.y + oy} r={2 * alpha} color={`rgba(255,255,255,${alpha})`} />
+          <Group key={flash.id ?? ('muzzle-' + index)} transform={[{ translateX: flash.x + ox }, { translateY: flash.y + oy }]}>
+            <Circle cx={0} cy={0} r={8} opacity={alpha * 0.18 * EFFECTS.glow}>
+              <RadialGradient c={ORIGIN} r={8} colors={[PALETTE.friendly, PALETTE.friendly + '00']} />
+            </Circle>
+            <Circle cx={0} cy={0} r={radius} style="stroke" strokeWidth={0.8} color={PALETTE.friendly} opacity={alpha * 0.55 * EFFECTS.glow} />
+            <Circle cx={0} cy={0} r={2} color={PALETTE.core} opacity={alpha * 0.85} />
           </Group>
         );
       })}

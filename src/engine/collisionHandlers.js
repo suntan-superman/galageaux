@@ -4,7 +4,8 @@
  */
 
 import { aabb } from './collision';
-import { spawnExplosion, spawnExplosionParticles, spawnImpactEffect, spawnSparks } from './particles';
+import { spawnExplosion, spawnExplosionParticles, spawnImpactEffect, spawnSparks, spawnContactParticles } from './particles';
+import { IMPACT_VISUALS, overlapContact } from './effectVisuals';
 import { triggerScreenshake } from './screenshake';
 import enemiesConfig from '../config/enemies.json';
 
@@ -27,6 +28,7 @@ export function checkBulletEnemyCollisions(bullets, enemies, {
   
   let scoreGain = 0;
   let killsEarned = 0;
+  let maxDestroyedSize = 0;
   const explosions = [];
   const particles = [];
   const scoreTexts = [];
@@ -49,21 +51,31 @@ export function checkBulletEnemyCollisions(bullets, enemies, {
         bulletConsumed[i] = true;
         hit = true;
         nextEnemy = { ...nextEnemy, hp: Math.max(0, (nextEnemy.hp ?? cfg.hp) - 1) };
+        const contact = overlapContact(bullet, enemy);
+        particles.push(...spawnContactParticles(contact.x, contact.y, {
+          vx: bullet.vx ?? 0, vy: bullet.vy ?? (-bullet.speed || -1), targetId: enemy.id,
+        }));
         onEnemyHit?.(nextEnemy, bullet);
         if (nextEnemy.hp === 0) break;
       }
     }
 
     if (hit && nextEnemy.hp === 0) {
+      maxDestroyedSize = Math.max(maxDestroyedSize, enemy.size);
       const centerX = enemy.x + enemy.size / 2;
       const centerY = enemy.y + enemy.size / 2;
       const enemyColor = cfg.color || '#38bdf8';
       
       // Spawn effects
-      explosions.push(spawnExplosion(centerX, centerY, 26, 0.25, enemyColor));
+      explosions.push(spawnExplosion(centerX, centerY, Math.max(22, Math.min(36, enemy.size + 2)), 0.25, enemyColor));
+      // Preserve every legacy RNG draw before thinning visual density: the live
+      // game shares Math.random with drops/spawning, so fewer draws alter play.
+      const legacyBurst = spawnExplosionParticles(centerX, centerY, 16, 'default', enemyColor);
+      const legacySparks = spawnSparks(centerX, centerY, 8, Math.PI / 2);
       particles.push(
-        ...spawnExplosionParticles(centerX, centerY, 16, 'default', enemyColor),
-        ...spawnSparks(centerX, centerY, 8, Math.PI / 2)
+        ...legacyBurst.filter((_, index) => index < 16 && index % 4 !== 3).slice(0, IMPACT_VISUALS.ordinaryBurstCount)
+          .map((particle, index) => ({ ...particle, visualKind: index % 3 === 0 ? 'fragment' : 'energy' })),
+        ...legacySparks.slice(0, IMPACT_VISUALS.ordinarySparkCount)
       );
       
       // Update combo
@@ -102,6 +114,7 @@ export function checkBulletEnemyCollisions(bullets, enemies, {
     results: {
       scoreGain,
       killsEarned,
+      maxDestroyedSize,
       explosions,
       particles,
       scoreTexts,
@@ -124,6 +137,7 @@ export function checkBulletBossCollisions(bullets, boss, screenshake) {
   }
 
   const survivingBullets = [];
+  const contacts = [];
   let hitCount = 0;
   const particles = [];
   const explosions = [];
@@ -139,6 +153,7 @@ export function checkBulletBossCollisions(bullets, boss, screenshake) {
       )
     ) {
       hitCount++;
+      contacts.push({ ...overlapContact(b, boss), bullet: b });
     } else {
       survivingBullets.push(b);
     }
@@ -152,14 +167,17 @@ export function checkBulletBossCollisions(bullets, boss, screenshake) {
     
     // Add impact sparks for each hit
     for (let i = 0; i < hitCount; i++) {
-      particles.push(
-        ...spawnImpactEffect(
-          hitX + (Math.random() - 0.5) * boss.width * 0.5,
-          hitY + (Math.random() - 0.5) * boss.height * 0.5,
-          6,
-          '#a855f7'
-        )
+      const legacyParticles = spawnImpactEffect(
+        hitX + (Math.random() - 0.5) * boss.width * 0.5,
+        hitY + (Math.random() - 0.5) * boss.height * 0.5,
+        6,
+        '#a855f7'
       );
+      const contact = contacts[i];
+      particles.push(...spawnContactParticles(contact.x, contact.y, {
+        vx: contact.bullet.vx ?? 0, vy: contact.bullet.vy ?? (-contact.bullet.speed || -1),
+        target: 'boss', legacyParticles,
+      }));
     }
 
     const nextHp = boss.hp - hitCount;

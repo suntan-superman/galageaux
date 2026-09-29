@@ -1,15 +1,15 @@
 import React from 'react';
 import { Rect, Group } from '@shopify/react-native-skia';
+import { PALETTE } from '../constants/visualTheme';
 
-export default function BossHealthBar({ health, maxHealth, x, y, width = 200, height = 16 }) {
+export default function BossHealthBar({ health, maxHealth, trailingHealth = health, x, y, width = 200, height = 10 }) {
   if (!health || !maxHealth || health <= 0) return null;
   
   const healthPercent = Math.max(0, Math.min(1, health / maxHealth));
   const barWidth = Math.max(0, (width - 4) * healthPercent);
+  const trailingWidth = (width - 4) * Math.max(healthPercent, Math.min(1, (trailingHealth ?? health) / maxHealth));
   
-  const barColor = healthPercent > 0.6 ? '#22c55e' : 
-                   healthPercent > 0.3 ? '#fbbf24' : 
-                   '#ef4444';
+  const barColor = healthPercent > 0.3 ? PALETTE.boss : PALETTE.hostile;
   
   return (
     <Group>
@@ -20,6 +20,7 @@ export default function BossHealthBar({ health, maxHealth, x, y, width = 200, he
         height={height}
         color="rgba(30,41,59,0.8)"
       />
+      <Rect x={x + 2} y={y + 2} width={trailingWidth} height={height - 4} color={PALETTE.core} opacity={0.45} />
       {barWidth > 0 && (
         <Rect
           x={x + 2}
