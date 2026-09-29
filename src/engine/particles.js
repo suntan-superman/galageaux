@@ -13,6 +13,7 @@
  * @property {number} life - Remaining life in seconds
  * @property {number} maxLife - Initial life for alpha calculations
  * @property {number} radius - Current particle radius
+ * @property {number} initialRadius - Radius at creation, before lifetime decay
  * @property {string} type - Particle type for rendering
  * @property {string} color - Hex color string
  * @property {number} rotation - Current rotation in radians
@@ -32,6 +33,17 @@ const COLOR_SCHEMES = {
   fire: ['#ff4500', '#ff6b35', '#ffa500', '#ffd700'],
   electric: ['#00ffff', '#4169e1', '#9370db', '#ffffff'],
 };
+
+// Keep the existing 60 Hz spark velocity decay, expressed per elapsed second.
+const SPARK_DRAG_RATE = -60 * Math.log(0.98);
+
+function createParticle(particle) {
+  return {
+    ...particle,
+    maxLife: particle.life,
+    initialRadius: particle.radius,
+  };
+}
 
 /**
  * Spawns explosion particles at a location
@@ -54,19 +66,18 @@ export function spawnExplosionParticles(x, y, count = 12, particleType = 'defaul
     const speed = 80 + Math.random() * 120; // Increased speed range
     const particleColor = colors[Math.floor(Math.random() * colors.length)];
     
-    parts.push({
+    parts.push(createParticle({
       x,
       y,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
       life: 0.5 + Math.random() * 0.3, // Longer life
-      maxLife: 0.5 + Math.random() * 0.3,
       radius: 2.5 + Math.random() * 2.5, // Larger particles
       type: particleType,
       color: particleColor,
       rotation: Math.random() * Math.PI * 2,
       rotationSpeed: (Math.random() - 0.5) * 10
-    });
+    }));
   }
   
   // Add inner burst of smaller, faster particles
@@ -76,19 +87,18 @@ export function spawnExplosionParticles(x, y, count = 12, particleType = 'defaul
     const speed = 150 + Math.random() * 100;
     const particleColor = colors[Math.floor(Math.random() * colors.length)];
     
-    parts.push({
+    parts.push(createParticle({
       x,
       y,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
       life: 0.3 + Math.random() * 0.2,
-      maxLife: 0.3 + Math.random() * 0.2,
       radius: 1 + Math.random() * 1.5,
       type: particleType,
       color: particleColor,
       rotation: Math.random() * Math.PI * 2,
       rotationSpeed: (Math.random() - 0.5) * 15
-    });
+    }));
   }
   
   // Add debris chunks for debris type
@@ -96,19 +106,18 @@ export function spawnExplosionParticles(x, y, count = 12, particleType = 'defaul
     for (let i = 0; i < Math.floor(count / 2); i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 40 + Math.random() * 60;
-      parts.push({
+      parts.push(createParticle({
         x,
         y,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         life: 0.7 + Math.random() * 0.4,
-        maxLife: 0.7 + Math.random() * 0.4,
         radius: 1.5 + Math.random() * 2,
         type: 'debris',
         color: '#475569',
         rotation: Math.random() * Math.PI * 2,
         rotationSpeed: (Math.random() - 0.5) * 8
-      });
+      }));
     }
   }
   
@@ -140,20 +149,19 @@ export function spawnLargeExplosion(x, y, type = 'boss') {
     const speed = 120 + Math.random() * 180;
     const particleColor = colors[Math.floor(Math.random() * colors.length)];
     
-    parts.push({
+    parts.push(createParticle({
       x,
       y,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
       life: 0.7 + Math.random() * 0.4,
-      maxLife: 0.7 + Math.random() * 0.4,
       radius: 4 + Math.random() * 4,
       type: 'explosion',
       color: particleColor,
       rotation: Math.random() * Math.PI * 2,
       rotationSpeed: (Math.random() - 0.5) * 8,
       glow: true,
-    });
+    }));
   }
   
   // Inner bright burst
@@ -161,19 +169,18 @@ export function spawnLargeExplosion(x, y, type = 'boss') {
     const angle = Math.random() * Math.PI * 2;
     const speed = 200 + Math.random() * 150;
     
-    parts.push({
+    parts.push(createParticle({
       x,
       y,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
       life: 0.4 + Math.random() * 0.2,
-      maxLife: 0.4 + Math.random() * 0.2,
       radius: 2 + Math.random() * 2,
       type: 'spark',
       color: '#ffffff',
       rotation: 0,
       rotationSpeed: 0,
-    });
+    }));
   }
   
   // Debris with physics
@@ -181,20 +188,19 @@ export function spawnLargeExplosion(x, y, type = 'boss') {
     const angle = Math.random() * Math.PI * 2;
     const speed = 60 + Math.random() * 100;
     
-    parts.push({
+    parts.push(createParticle({
       x: x + (Math.random() - 0.5) * 20,
       y: y + (Math.random() - 0.5) * 20,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed - 50, // Initial upward bias
       life: 1.0 + Math.random() * 0.5,
-      maxLife: 1.0 + Math.random() * 0.5,
       radius: 2 + Math.random() * 3,
       type: 'debris',
       color: COLOR_SCHEMES.debris[Math.floor(Math.random() * COLOR_SCHEMES.debris.length)],
       rotation: Math.random() * Math.PI * 2,
       rotationSpeed: (Math.random() - 0.5) * 12,
       gravity: 200 + Math.random() * 100,
-    });
+    }));
   }
   
   // Sparks shooting outward
@@ -222,24 +228,30 @@ export function spawnLargeExplosion(x, y, type = 'boss') {
 export function updateParticles(particles, dt) {
   return particles
     .map(p => {
-      const newLife = p.life - dt;
-      const alpha = Math.max(0, newLife / p.maxLife);
+      const newLife = Math.max(0, p.life - dt);
+      const alpha = p.maxLife > 0 ? Math.max(0, Math.min(1, newLife / p.maxLife)) : 0;
+      const initialRadius = p.initialRadius ?? p.radius;
       const newRotation = (p.rotation || 0) + (p.rotationSpeed || 0) * dt;
       
       // Apply gravity (debris particles have custom gravity, others use type-based)
       const gravity = p.gravity || (p.type === 'debris' ? 100 : 0);
       
-      // Apply drag for more natural motion
-      const drag = p.type === 'spark' ? 0.98 : 1.0;
+      // Integrate exponential drag over dt so both velocity and travel agree
+      // across frame rates. Non-spark particles retain ballistic motion.
+      const isSpark = p.type === 'spark';
+      const drag = isSpark ? Math.exp(-SPARK_DRAG_RATE * dt) : 1;
+      const velocityTime = isSpark ? -Math.expm1(-SPARK_DRAG_RATE * dt) / SPARK_DRAG_RATE : dt;
+      const gravityTime = isSpark ? (dt - velocityTime) / SPARK_DRAG_RATE : dt * dt * 0.5;
       
       return {
         ...p,
-        x: p.x + p.vx * dt,
-        y: p.y + (p.vy * dt) + (gravity * dt * dt * 0.5),
+        x: p.x + p.vx * velocityTime,
+        y: p.y + p.vy * velocityTime + gravity * gravityTime,
         vx: p.vx * drag,
-        vy: (p.vy + gravity * dt) * drag,
+        vy: p.vy * drag + gravity * velocityTime,
         life: newLife,
-        radius: p.radius * Math.sqrt(alpha), // Smoother fade
+        initialRadius,
+        radius: initialRadius * Math.sqrt(alpha),
         rotation: newRotation,
         alpha: alpha, // Store for rendering
       };
@@ -332,17 +344,16 @@ export function updateExplosion(explosion, dt) {
 
 // New trail particle system
 export function spawnTrailParticle(x, y, color = '#38bdf8') {
-  return {
+  return createParticle({
     x,
     y,
     vx: 0,
     vy: 0,
     life: 0.15,
-    maxLife: 0.15,
     radius: 2,
     type: 'trail',
     color
-  };
+  });
 }
 
 // Impact effect for hits
@@ -352,17 +363,16 @@ export function spawnImpactEffect(x, y, count = 8, color = '#fbbf24') {
     const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.3;
     const speed = 60 + Math.random() * 40;
     
-    parts.push({
+    parts.push(createParticle({
       x,
       y,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
       life: 0.2 + Math.random() * 0.15,
-      maxLife: 0.2 + Math.random() * 0.15,
       radius: 1.5 + Math.random() * 1,
       type: 'impact',
       color
-    });
+    }));
   }
   return parts;
 }
@@ -381,17 +391,16 @@ export function spawnSparks(x, y, count = 12, direction = null) {
     
     const speed = 100 + Math.random() * 100;
     
-    parts.push({
+    parts.push(createParticle({
       x,
       y,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
       life: 0.3 + Math.random() * 0.2,
-      maxLife: 0.3 + Math.random() * 0.2,
       radius: 1 + Math.random() * 1.5,
       type: 'spark',
       color: '#fef3c7'
-    });
+    }));
   }
   return parts;
 }

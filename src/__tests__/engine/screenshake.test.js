@@ -108,3 +108,30 @@ describe('Screenshake System', () => {
     });
   });
 });
+
+describe('Phase 0 screenshake expiry', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('returns zero immediately when a frame overshoots the remaining duration', () => {
+    jest.spyOn(Math, 'random').mockReturnValue(1);
+    const shake = createScreenshake();
+    triggerScreenshake(shake, 10, 0.1);
+    expect(updateScreenshake(shake, 0.3)).toEqual({ ox: 0, oy: 0 });
+    expect(shake.time).toBe(0);
+  });
+
+  it.each([30, 60, 120])('uses the same bounded envelope after equal elapsed time at %i Hz', hz => {
+    jest.spyOn(Math, 'random').mockReturnValue(1);
+    const shake = createScreenshake();
+    triggerScreenshake(shake, 10, 0.5);
+    let offset;
+    for (let frame = 0; frame < hz / 5; frame++) {
+      offset = updateScreenshake(shake, 1 / hz);
+    }
+    expect(shake.time).toBeCloseTo(0.3, 10);
+    expect(offset.ox).toBeCloseTo(6, 10);
+    expect(offset.oy).toBeCloseTo(6, 10);
+    expect(updateScreenshake(shake, 1)).toEqual({ ox: 0, oy: 0 });
+    expect(shake.time).toBe(0);
+  });
+});

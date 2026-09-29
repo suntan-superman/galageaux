@@ -6,7 +6,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as AudioManager from '../engine/audio';
-import { STORAGE_KEYS } from '../constants/game';
+import { PLAYER, STORAGE_KEYS } from '../constants/game';
+import { normalizeTiltSensitivity } from '../engine/inputSettings';
 
 const STORAGE_KEY_TILT = STORAGE_KEYS.TILT_SENSITIVITY;
 const STORAGE_KEY_FIRE_POS = STORAGE_KEYS.FIRE_BUTTON_POSITION;
@@ -32,7 +33,7 @@ const DEFAULT_AUDIO_SETTINGS = {
  * @returns {Object} Settings state and handlers
  */
 export default function useGameSettings() {
-  const [tiltSensitivity, setTiltSensitivity] = useState(5);
+  const [tiltSensitivity, setTiltSensitivity] = useState(PLAYER.TILT_SENSITIVITY_DEFAULT);
   const [fireButtonPosition, setFireButtonPosition] = useState('right');
   const [audioSettings, setAudioSettings] = useState(DEFAULT_AUDIO_SETTINGS);
   const [loaded, setLoaded] = useState(false);
@@ -48,10 +49,7 @@ export default function useGameSettings() {
         ]);
 
         if (storedTilt) {
-          const value = parseInt(storedTilt, 10);
-          if (!Number.isNaN(value)) {
-            setTiltSensitivity(Math.min(10, Math.max(1, value)));
-          }
+          setTiltSensitivity(normalizeTiltSensitivity(storedTilt));
         }
 
         if (storedFirePos && (storedFirePos === 'left' || storedFirePos === 'right')) {
@@ -90,9 +88,10 @@ export default function useGameSettings() {
 
   // Tilt sensitivity handler
   const handleTiltSensitivityChange = useCallback(async (nextValue) => {
-    setTiltSensitivity(nextValue);
+    const value = normalizeTiltSensitivity(nextValue);
+    setTiltSensitivity(value);
     try {
-      await AsyncStorage.setItem(STORAGE_KEY_TILT, String(nextValue));
+      await AsyncStorage.setItem(STORAGE_KEY_TILT, String(value));
     } catch (err) {
       console.warn('Failed to save tilt sensitivity', err);
     }

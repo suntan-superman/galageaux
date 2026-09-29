@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
 /**
  * @typedef {Object} StageCompleteOverlayProps
@@ -12,7 +12,7 @@ import { View, Text, StyleSheet } from 'react-native';
  * @property {string[]} allStages - Array of all stage identifiers
  */
 
-export default function StageCompleteOverlay({ visible, currentStage, allStages }) {
+export default function StageCompleteOverlay({ visible, currentStage, allStages, onRetry, onExit }) {
   if (!visible) return null;
 
   const currentIndex = allStages.indexOf(currentStage);
@@ -29,7 +29,15 @@ export default function StageCompleteOverlay({ visible, currentStage, allStages 
             Get ready for {nextStage.toUpperCase()}...
           </Text>
         ) : (
-          <Text style={styles.victory}>🎉 YOU WIN! 🎉</Text>
+          <>
+            <Text style={styles.victory}>🎉 YOU WIN! 🎉</Text>
+            <TouchableOpacity accessibilityRole="button" onPress={onRetry} style={styles.action}>
+              <Text style={styles.next}>PLAY AGAIN</Text>
+            </TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" onPress={onExit} style={styles.action}>
+              <Text style={styles.next}>MAIN MENU</Text>
+            </TouchableOpacity>
+          </>
         )}
       </View>
     </View>
@@ -89,5 +97,6 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '900',
     letterSpacing: 2
-  }
+  },
+  action: { padding: 12, marginTop: 8 }
 });

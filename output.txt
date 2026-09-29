@@ -1,0 +1,814 @@
+PS C:\users\sjroy\source\galageaux> npm test -- --runInBand
+
+> galageaux@1.0.0 test
+> jest --runInBand
+
+ FAIL  src/__tests__/engine/gameReducer.test.js
+  ● Test suite failed to run
+
+    Cannot find module 'babel-preset-expo'
+    Require stack:
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\plugins.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\InlineSnapshots.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\State.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-runtime\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\cli\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\run.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\bin\jest.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest\bin\jest.js
+
+    Make sure that all the Babel plugins and presets you are using
+    are defined as dependencies or devDependencies in your package.json
+    file. It's possible that the missing plugin is loaded by a preset
+    you are using that forgot to add the plugin to its dependencies: you
+    can workaround this problem by explicitly adding the missing package
+    to your top-level package.json.
+
+      at tryRequireResolve (node_modules/@babel/core/lib/config/files/plugins.js:128:11)
+      at resolveStandardizedNameForRequire (node_modules/@babel/core/lib/config/files/plugins.js:162:19)
+      at resolveStandardizedName (node_modules/@babel/core/lib/config/files/plugins.js:183:12)
+      at loadPreset (node_modules/@babel/core/lib/config/files/plugins.js:68:7)
+          at loadPreset.next (<anonymous>)
+      at createDescriptor (node_modules/@babel/core/lib/config/config-descriptors.js:140:16)
+          at createDescriptor.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at node_modules/gensync/index.js:31:34
+          at Array.map (<anonymous>)
+      at Function.sync (node_modules/gensync/index.js:31:22)
+      at Function.all (node_modules/gensync/index.js:210:24)
+      at createDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:102:41)
+          at createDescriptors.next (<anonymous>)
+      at createPresetDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:96:17)
+          at createPresetDescriptors.next (<anonymous>)
+      at node_modules/@babel/core/lib/gensync-utils/functional.js:22:27
+      at mergeChainOpts (node_modules/@babel/core/lib/config/config-chain.js:350:34)
+          at mergeChainOpts.next (<anonymous>)
+      at chainWalker (node_modules/@babel/core/lib/config/config-chain.js:316:14)
+          at chainWalker.next (<anonymous>)
+      at loadFileChain (node_modules/@babel/core/lib/config/config-chain.js:191:24)
+          at loadFileChain.next (<anonymous>)
+      at buildRootChain (node_modules/@babel/core/lib/config/config-chain.js:77:27)
+          at buildRootChain.next (<anonymous>)
+      at loadPrivatePartialConfig (node_modules/@babel/core/lib/config/partial.js:72:62)
+          at loadPrivatePartialConfig.next (<anonymous>)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/partial.js:115:25)
+          at loadPartialConfig.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at sync (node_modules/gensync/index.js:89:14)
+      at stopHiding - secret - don't use this - v1 (node_modules/@babel/core/lib/errors/rewrite-stack-trace.js:47:12)
+      at loadPartialConfigSync (node_modules/@babel/core/lib/config/index.js:37:84)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/index.js:45:12)
+      at ScriptTransformer._getCacheKey (node_modules/@jest/transform/build/ScriptTransformer.js:228:41)
+      at ScriptTransformer._getFileCachePath (node_modules/@jest/transform/build/ScriptTransformer.js:289:27)
+      at ScriptTransformer.transformSource (node_modules/@jest/transform/build/ScriptTransformer.js:525:32)
+      at revertHook.exts (node_modules/@jest/transform/build/ScriptTransformer.js:776:18)
+      at Module._compile (node_modules/pirates/lib/index.js:124:29)
+      at Object.newLoader (node_modules/pirates/lib/index.js:134:7)
+
+ FAIL  src/__tests__/engine/boss-patterns.test.js
+  ● Test suite failed to run
+
+    Cannot find module 'babel-preset-expo'
+    Require stack:
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\plugins.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\InlineSnapshots.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\State.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-runtime\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\cli\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\run.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\bin\jest.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest\bin\jest.js
+
+    Make sure that all the Babel plugins and presets you are using
+    are defined as dependencies or devDependencies in your package.json
+    file. It's possible that the missing plugin is loaded by a preset
+    you are using that forgot to add the plugin to its dependencies: you
+    can workaround this problem by explicitly adding the missing package
+    to your top-level package.json.
+
+      at tryRequireResolve (node_modules/@babel/core/lib/config/files/plugins.js:128:11)
+      at resolveStandardizedNameForRequire (node_modules/@babel/core/lib/config/files/plugins.js:162:19)
+      at resolveStandardizedName (node_modules/@babel/core/lib/config/files/plugins.js:183:12)
+      at loadPreset (node_modules/@babel/core/lib/config/files/plugins.js:68:7)
+          at loadPreset.next (<anonymous>)
+      at createDescriptor (node_modules/@babel/core/lib/config/config-descriptors.js:140:16)
+          at createDescriptor.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at node_modules/gensync/index.js:31:34
+          at Array.map (<anonymous>)
+      at Function.sync (node_modules/gensync/index.js:31:22)
+      at Function.all (node_modules/gensync/index.js:210:24)
+      at createDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:102:41)
+          at createDescriptors.next (<anonymous>)
+      at createPresetDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:96:17)
+          at createPresetDescriptors.next (<anonymous>)
+      at node_modules/@babel/core/lib/gensync-utils/functional.js:22:27
+      at mergeChainOpts (node_modules/@babel/core/lib/config/config-chain.js:350:34)
+          at mergeChainOpts.next (<anonymous>)
+      at chainWalker (node_modules/@babel/core/lib/config/config-chain.js:316:14)
+          at chainWalker.next (<anonymous>)
+      at loadFileChain (node_modules/@babel/core/lib/config/config-chain.js:191:24)
+          at loadFileChain.next (<anonymous>)
+      at buildRootChain (node_modules/@babel/core/lib/config/config-chain.js:77:27)
+          at buildRootChain.next (<anonymous>)
+      at loadPrivatePartialConfig (node_modules/@babel/core/lib/config/partial.js:72:62)
+          at loadPrivatePartialConfig.next (<anonymous>)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/partial.js:115:25)
+          at loadPartialConfig.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at sync (node_modules/gensync/index.js:89:14)
+      at stopHiding - secret - don't use this - v1 (node_modules/@babel/core/lib/errors/rewrite-stack-trace.js:47:12)
+      at loadPartialConfigSync (node_modules/@babel/core/lib/config/index.js:37:84)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/index.js:45:12)
+      at ScriptTransformer._getCacheKey (node_modules/@jest/transform/build/ScriptTransformer.js:228:41)
+      at ScriptTransformer._getFileCachePath (node_modules/@jest/transform/build/ScriptTransformer.js:289:27)
+      at ScriptTransformer.transformSource (node_modules/@jest/transform/build/ScriptTransformer.js:525:32)
+      at revertHook.exts (node_modules/@jest/transform/build/ScriptTransformer.js:776:18)
+      at Module._compile (node_modules/pirates/lib/index.js:124:29)
+      at Object.newLoader (node_modules/pirates/lib/index.js:134:7)
+
+ FAIL  src/__tests__/engine/formations.test.js
+  ● Test suite failed to run
+
+    Cannot find module 'babel-preset-expo'
+    Require stack:
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\plugins.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\InlineSnapshots.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\State.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-runtime\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\cli\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\run.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\bin\jest.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest\bin\jest.js
+
+    Make sure that all the Babel plugins and presets you are using
+    are defined as dependencies or devDependencies in your package.json
+    file. It's possible that the missing plugin is loaded by a preset
+    you are using that forgot to add the plugin to its dependencies: you
+    can workaround this problem by explicitly adding the missing package
+    to your top-level package.json.
+
+      at tryRequireResolve (node_modules/@babel/core/lib/config/files/plugins.js:128:11)
+      at resolveStandardizedNameForRequire (node_modules/@babel/core/lib/config/files/plugins.js:162:19)
+      at resolveStandardizedName (node_modules/@babel/core/lib/config/files/plugins.js:183:12)
+      at loadPreset (node_modules/@babel/core/lib/config/files/plugins.js:68:7)
+          at loadPreset.next (<anonymous>)
+      at createDescriptor (node_modules/@babel/core/lib/config/config-descriptors.js:140:16)
+          at createDescriptor.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at node_modules/gensync/index.js:31:34
+          at Array.map (<anonymous>)
+      at Function.sync (node_modules/gensync/index.js:31:22)
+      at Function.all (node_modules/gensync/index.js:210:24)
+      at createDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:102:41)
+          at createDescriptors.next (<anonymous>)
+      at createPresetDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:96:17)
+          at createPresetDescriptors.next (<anonymous>)
+      at node_modules/@babel/core/lib/gensync-utils/functional.js:22:27
+      at mergeChainOpts (node_modules/@babel/core/lib/config/config-chain.js:350:34)
+          at mergeChainOpts.next (<anonymous>)
+      at chainWalker (node_modules/@babel/core/lib/config/config-chain.js:316:14)
+          at chainWalker.next (<anonymous>)
+      at loadFileChain (node_modules/@babel/core/lib/config/config-chain.js:191:24)
+          at loadFileChain.next (<anonymous>)
+      at buildRootChain (node_modules/@babel/core/lib/config/config-chain.js:77:27)
+          at buildRootChain.next (<anonymous>)
+      at loadPrivatePartialConfig (node_modules/@babel/core/lib/config/partial.js:72:62)
+          at loadPrivatePartialConfig.next (<anonymous>)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/partial.js:115:25)
+          at loadPartialConfig.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at sync (node_modules/gensync/index.js:89:14)
+      at stopHiding - secret - don't use this - v1 (node_modules/@babel/core/lib/errors/rewrite-stack-trace.js:47:12)
+      at loadPartialConfigSync (node_modules/@babel/core/lib/config/index.js:37:84)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/index.js:45:12)
+      at ScriptTransformer._getCacheKey (node_modules/@jest/transform/build/ScriptTransformer.js:228:41)
+      at ScriptTransformer._getFileCachePath (node_modules/@jest/transform/build/ScriptTransformer.js:289:27)
+      at ScriptTransformer.transformSource (node_modules/@jest/transform/build/ScriptTransformer.js:525:32)
+      at revertHook.exts (node_modules/@jest/transform/build/ScriptTransformer.js:776:18)
+      at Module._compile (node_modules/pirates/lib/index.js:124:29)
+      at Object.newLoader (node_modules/pirates/lib/index.js:134:7)
+
+ FAIL  src/__tests__/engine/particles.test.js
+  ● Test suite failed to run
+
+    Cannot find module 'babel-preset-expo'
+    Require stack:
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\plugins.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\InlineSnapshots.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\State.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-runtime\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\cli\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\run.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\bin\jest.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest\bin\jest.js
+
+    Make sure that all the Babel plugins and presets you are using
+    are defined as dependencies or devDependencies in your package.json
+    file. It's possible that the missing plugin is loaded by a preset
+    you are using that forgot to add the plugin to its dependencies: you
+    can workaround this problem by explicitly adding the missing package
+    to your top-level package.json.
+
+      at tryRequireResolve (node_modules/@babel/core/lib/config/files/plugins.js:128:11)
+      at resolveStandardizedNameForRequire (node_modules/@babel/core/lib/config/files/plugins.js:162:19)
+      at resolveStandardizedName (node_modules/@babel/core/lib/config/files/plugins.js:183:12)
+      at loadPreset (node_modules/@babel/core/lib/config/files/plugins.js:68:7)
+          at loadPreset.next (<anonymous>)
+      at createDescriptor (node_modules/@babel/core/lib/config/config-descriptors.js:140:16)
+          at createDescriptor.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at node_modules/gensync/index.js:31:34
+          at Array.map (<anonymous>)
+      at Function.sync (node_modules/gensync/index.js:31:22)
+      at Function.all (node_modules/gensync/index.js:210:24)
+      at createDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:102:41)
+          at createDescriptors.next (<anonymous>)
+      at createPresetDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:96:17)
+          at createPresetDescriptors.next (<anonymous>)
+      at node_modules/@babel/core/lib/gensync-utils/functional.js:22:27
+      at mergeChainOpts (node_modules/@babel/core/lib/config/config-chain.js:350:34)
+          at mergeChainOpts.next (<anonymous>)
+      at chainWalker (node_modules/@babel/core/lib/config/config-chain.js:316:14)
+          at chainWalker.next (<anonymous>)
+      at loadFileChain (node_modules/@babel/core/lib/config/config-chain.js:191:24)
+          at loadFileChain.next (<anonymous>)
+      at buildRootChain (node_modules/@babel/core/lib/config/config-chain.js:77:27)
+          at buildRootChain.next (<anonymous>)
+      at loadPrivatePartialConfig (node_modules/@babel/core/lib/config/partial.js:72:62)
+          at loadPrivatePartialConfig.next (<anonymous>)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/partial.js:115:25)
+          at loadPartialConfig.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at sync (node_modules/gensync/index.js:89:14)
+      at stopHiding - secret - don't use this - v1 (node_modules/@babel/core/lib/errors/rewrite-stack-trace.js:47:12)
+      at loadPartialConfigSync (node_modules/@babel/core/lib/config/index.js:37:84)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/index.js:45:12)
+      at ScriptTransformer._getCacheKey (node_modules/@jest/transform/build/ScriptTransformer.js:228:41)
+      at ScriptTransformer._getFileCachePath (node_modules/@jest/transform/build/ScriptTransformer.js:289:27)
+      at ScriptTransformer.transformSource (node_modules/@jest/transform/build/ScriptTransformer.js:525:32)
+      at revertHook.exts (node_modules/@jest/transform/build/ScriptTransformer.js:776:18)
+      at Module._compile (node_modules/pirates/lib/index.js:124:29)
+      at Object.newLoader (node_modules/pirates/lib/index.js:134:7)
+
+ FAIL  src/__tests__/hooks/useGameState.test.js
+  ● Test suite failed to run
+
+    Cannot find module 'babel-preset-expo'
+    Require stack:
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\plugins.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\InlineSnapshots.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\State.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-runtime\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\cli\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\run.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\bin\jest.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest\bin\jest.js
+
+    Make sure that all the Babel plugins and presets you are using
+    are defined as dependencies or devDependencies in your package.json
+    file. It's possible that the missing plugin is loaded by a preset
+    you are using that forgot to add the plugin to its dependencies: you
+    can workaround this problem by explicitly adding the missing package
+    to your top-level package.json.
+
+      at tryRequireResolve (node_modules/@babel/core/lib/config/files/plugins.js:128:11)
+      at resolveStandardizedNameForRequire (node_modules/@babel/core/lib/config/files/plugins.js:162:19)
+      at resolveStandardizedName (node_modules/@babel/core/lib/config/files/plugins.js:183:12)
+      at loadPreset (node_modules/@babel/core/lib/config/files/plugins.js:68:7)
+          at loadPreset.next (<anonymous>)
+      at createDescriptor (node_modules/@babel/core/lib/config/config-descriptors.js:140:16)
+          at createDescriptor.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at node_modules/gensync/index.js:31:34
+          at Array.map (<anonymous>)
+      at Function.sync (node_modules/gensync/index.js:31:22)
+      at Function.all (node_modules/gensync/index.js:210:24)
+      at createDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:102:41)
+          at createDescriptors.next (<anonymous>)
+      at createPresetDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:96:17)
+          at createPresetDescriptors.next (<anonymous>)
+      at node_modules/@babel/core/lib/gensync-utils/functional.js:22:27
+      at mergeChainOpts (node_modules/@babel/core/lib/config/config-chain.js:350:34)
+          at mergeChainOpts.next (<anonymous>)
+      at chainWalker (node_modules/@babel/core/lib/config/config-chain.js:316:14)
+          at chainWalker.next (<anonymous>)
+      at loadFileChain (node_modules/@babel/core/lib/config/config-chain.js:191:24)
+          at loadFileChain.next (<anonymous>)
+      at buildRootChain (node_modules/@babel/core/lib/config/config-chain.js:77:27)
+          at buildRootChain.next (<anonymous>)
+      at loadPrivatePartialConfig (node_modules/@babel/core/lib/config/partial.js:72:62)
+          at loadPrivatePartialConfig.next (<anonymous>)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/partial.js:115:25)
+          at loadPartialConfig.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at sync (node_modules/gensync/index.js:89:14)
+      at stopHiding - secret - don't use this - v1 (node_modules/@babel/core/lib/errors/rewrite-stack-trace.js:47:12)
+      at loadPartialConfigSync (node_modules/@babel/core/lib/config/index.js:37:84)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/index.js:45:12)
+      at ScriptTransformer._getCacheKey (node_modules/@jest/transform/build/ScriptTransformer.js:228:41)
+      at ScriptTransformer._getFileCachePath (node_modules/@jest/transform/build/ScriptTransformer.js:289:27)
+      at ScriptTransformer.transformSource (node_modules/@jest/transform/build/ScriptTransformer.js:525:32)
+      at revertHook.exts (node_modules/@jest/transform/build/ScriptTransformer.js:776:18)
+      at Module._compile (node_modules/pirates/lib/index.js:124:29)
+      at Object.newLoader (node_modules/pirates/lib/index.js:134:7)
+
+ FAIL  src/__tests__/engine/objectPool.test.js
+  ● Test suite failed to run
+
+    Cannot find module 'babel-preset-expo'
+    Require stack:
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\plugins.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\InlineSnapshots.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\State.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-runtime\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\cli\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\run.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\bin\jest.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest\bin\jest.js
+
+    Make sure that all the Babel plugins and presets you are using
+    are defined as dependencies or devDependencies in your package.json
+    file. It's possible that the missing plugin is loaded by a preset
+    you are using that forgot to add the plugin to its dependencies: you
+    can workaround this problem by explicitly adding the missing package
+    to your top-level package.json.
+
+      at tryRequireResolve (node_modules/@babel/core/lib/config/files/plugins.js:128:11)
+      at resolveStandardizedNameForRequire (node_modules/@babel/core/lib/config/files/plugins.js:162:19)
+      at resolveStandardizedName (node_modules/@babel/core/lib/config/files/plugins.js:183:12)
+      at loadPreset (node_modules/@babel/core/lib/config/files/plugins.js:68:7)
+          at loadPreset.next (<anonymous>)
+      at createDescriptor (node_modules/@babel/core/lib/config/config-descriptors.js:140:16)
+          at createDescriptor.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at node_modules/gensync/index.js:31:34
+          at Array.map (<anonymous>)
+      at Function.sync (node_modules/gensync/index.js:31:22)
+      at Function.all (node_modules/gensync/index.js:210:24)
+      at createDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:102:41)
+          at createDescriptors.next (<anonymous>)
+      at createPresetDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:96:17)
+          at createPresetDescriptors.next (<anonymous>)
+      at node_modules/@babel/core/lib/gensync-utils/functional.js:22:27
+      at mergeChainOpts (node_modules/@babel/core/lib/config/config-chain.js:350:34)
+          at mergeChainOpts.next (<anonymous>)
+      at chainWalker (node_modules/@babel/core/lib/config/config-chain.js:316:14)
+          at chainWalker.next (<anonymous>)
+      at loadFileChain (node_modules/@babel/core/lib/config/config-chain.js:191:24)
+          at loadFileChain.next (<anonymous>)
+      at buildRootChain (node_modules/@babel/core/lib/config/config-chain.js:77:27)
+          at buildRootChain.next (<anonymous>)
+      at loadPrivatePartialConfig (node_modules/@babel/core/lib/config/partial.js:72:62)
+          at loadPrivatePartialConfig.next (<anonymous>)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/partial.js:115:25)
+          at loadPartialConfig.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at sync (node_modules/gensync/index.js:89:14)
+      at stopHiding - secret - don't use this - v1 (node_modules/@babel/core/lib/errors/rewrite-stack-trace.js:47:12)
+      at loadPartialConfigSync (node_modules/@babel/core/lib/config/index.js:37:84)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/index.js:45:12)
+      at ScriptTransformer._getCacheKey (node_modules/@jest/transform/build/ScriptTransformer.js:228:41)
+      at ScriptTransformer._getFileCachePath (node_modules/@jest/transform/build/ScriptTransformer.js:289:27)
+      at ScriptTransformer.transformSource (node_modules/@jest/transform/build/ScriptTransformer.js:525:32)
+      at revertHook.exts (node_modules/@jest/transform/build/ScriptTransformer.js:776:18)
+      at Module._compile (node_modules/pirates/lib/index.js:124:29)
+      at Object.newLoader (node_modules/pirates/lib/index.js:134:7)
+
+ FAIL  src/__tests__/engine/audio.test.js
+  ● Test suite failed to run
+
+    Cannot find module 'babel-preset-expo'
+    Require stack:
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\plugins.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\InlineSnapshots.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\State.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-runtime\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\cli\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\run.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\bin\jest.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest\bin\jest.js
+
+    Make sure that all the Babel plugins and presets you are using
+    are defined as dependencies or devDependencies in your package.json
+    file. It's possible that the missing plugin is loaded by a preset
+    you are using that forgot to add the plugin to its dependencies: you
+    can workaround this problem by explicitly adding the missing package
+    to your top-level package.json.
+
+      at tryRequireResolve (node_modules/@babel/core/lib/config/files/plugins.js:128:11)
+      at resolveStandardizedNameForRequire (node_modules/@babel/core/lib/config/files/plugins.js:162:19)
+      at resolveStandardizedName (node_modules/@babel/core/lib/config/files/plugins.js:183:12)
+      at loadPreset (node_modules/@babel/core/lib/config/files/plugins.js:68:7)
+          at loadPreset.next (<anonymous>)
+      at createDescriptor (node_modules/@babel/core/lib/config/config-descriptors.js:140:16)
+          at createDescriptor.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at node_modules/gensync/index.js:31:34
+          at Array.map (<anonymous>)
+      at Function.sync (node_modules/gensync/index.js:31:22)
+      at Function.all (node_modules/gensync/index.js:210:24)
+      at createDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:102:41)
+          at createDescriptors.next (<anonymous>)
+      at createPresetDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:96:17)
+          at createPresetDescriptors.next (<anonymous>)
+      at node_modules/@babel/core/lib/gensync-utils/functional.js:22:27
+      at mergeChainOpts (node_modules/@babel/core/lib/config/config-chain.js:350:34)
+          at mergeChainOpts.next (<anonymous>)
+      at chainWalker (node_modules/@babel/core/lib/config/config-chain.js:316:14)
+          at chainWalker.next (<anonymous>)
+      at loadFileChain (node_modules/@babel/core/lib/config/config-chain.js:191:24)
+          at loadFileChain.next (<anonymous>)
+      at buildRootChain (node_modules/@babel/core/lib/config/config-chain.js:77:27)
+          at buildRootChain.next (<anonymous>)
+      at loadPrivatePartialConfig (node_modules/@babel/core/lib/config/partial.js:72:62)
+          at loadPrivatePartialConfig.next (<anonymous>)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/partial.js:115:25)
+          at loadPartialConfig.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at sync (node_modules/gensync/index.js:89:14)
+      at stopHiding - secret - don't use this - v1 (node_modules/@babel/core/lib/errors/rewrite-stack-trace.js:47:12)
+      at loadPartialConfigSync (node_modules/@babel/core/lib/config/index.js:37:84)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/index.js:45:12)
+      at ScriptTransformer._getCacheKey (node_modules/@jest/transform/build/ScriptTransformer.js:228:41)
+      at ScriptTransformer._getFileCachePath (node_modules/@jest/transform/build/ScriptTransformer.js:289:27)
+      at ScriptTransformer.transformSource (node_modules/@jest/transform/build/ScriptTransformer.js:525:32)
+      at revertHook.exts (node_modules/@jest/transform/build/ScriptTransformer.js:776:18)
+      at Module._compile (node_modules/pirates/lib/index.js:124:29)
+      at Object.newLoader (node_modules/pirates/lib/index.js:134:7)
+
+ FAIL  src/__tests__/engine/entityLimits.test.js
+  ● Test suite failed to run
+
+    Cannot find module 'babel-preset-expo'
+    Require stack:
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\plugins.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\InlineSnapshots.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\State.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-runtime\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\cli\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\run.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\bin\jest.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest\bin\jest.js
+
+    Make sure that all the Babel plugins and presets you are using
+    are defined as dependencies or devDependencies in your package.json
+    file. It's possible that the missing plugin is loaded by a preset
+    you are using that forgot to add the plugin to its dependencies: you
+    can workaround this problem by explicitly adding the missing package
+    to your top-level package.json.
+
+      at tryRequireResolve (node_modules/@babel/core/lib/config/files/plugins.js:128:11)
+      at resolveStandardizedNameForRequire (node_modules/@babel/core/lib/config/files/plugins.js:162:19)
+      at resolveStandardizedName (node_modules/@babel/core/lib/config/files/plugins.js:183:12)
+      at loadPreset (node_modules/@babel/core/lib/config/files/plugins.js:68:7)
+          at loadPreset.next (<anonymous>)
+      at createDescriptor (node_modules/@babel/core/lib/config/config-descriptors.js:140:16)
+          at createDescriptor.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at node_modules/gensync/index.js:31:34
+          at Array.map (<anonymous>)
+      at Function.sync (node_modules/gensync/index.js:31:22)
+      at Function.all (node_modules/gensync/index.js:210:24)
+      at createDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:102:41)
+          at createDescriptors.next (<anonymous>)
+      at createPresetDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:96:17)
+          at createPresetDescriptors.next (<anonymous>)
+      at node_modules/@babel/core/lib/gensync-utils/functional.js:22:27
+      at mergeChainOpts (node_modules/@babel/core/lib/config/config-chain.js:350:34)
+          at mergeChainOpts.next (<anonymous>)
+      at chainWalker (node_modules/@babel/core/lib/config/config-chain.js:316:14)
+          at chainWalker.next (<anonymous>)
+      at loadFileChain (node_modules/@babel/core/lib/config/config-chain.js:191:24)
+          at loadFileChain.next (<anonymous>)
+      at buildRootChain (node_modules/@babel/core/lib/config/config-chain.js:77:27)
+          at buildRootChain.next (<anonymous>)
+      at loadPrivatePartialConfig (node_modules/@babel/core/lib/config/partial.js:72:62)
+          at loadPrivatePartialConfig.next (<anonymous>)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/partial.js:115:25)
+          at loadPartialConfig.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at sync (node_modules/gensync/index.js:89:14)
+      at stopHiding - secret - don't use this - v1 (node_modules/@babel/core/lib/errors/rewrite-stack-trace.js:47:12)
+      at loadPartialConfigSync (node_modules/@babel/core/lib/config/index.js:37:84)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/index.js:45:12)
+      at ScriptTransformer._getCacheKey (node_modules/@jest/transform/build/ScriptTransformer.js:228:41)
+      at ScriptTransformer._getFileCachePath (node_modules/@jest/transform/build/ScriptTransformer.js:289:27)
+      at ScriptTransformer.transformSource (node_modules/@jest/transform/build/ScriptTransformer.js:525:32)
+      at revertHook.exts (node_modules/@jest/transform/build/ScriptTransformer.js:776:18)
+      at Module._compile (node_modules/pirates/lib/index.js:124:29)
+      at Object.newLoader (node_modules/pirates/lib/index.js:134:7)
+
+ FAIL  src/__tests__/engine/difficulty.test.js
+  ● Test suite failed to run
+
+    Cannot find module 'babel-preset-expo'
+    Require stack:
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\plugins.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\InlineSnapshots.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\State.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-runtime\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\cli\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\run.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\bin\jest.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest\bin\jest.js
+
+    Make sure that all the Babel plugins and presets you are using
+    are defined as dependencies or devDependencies in your package.json
+    file. It's possible that the missing plugin is loaded by a preset
+    you are using that forgot to add the plugin to its dependencies: you
+    can workaround this problem by explicitly adding the missing package
+    to your top-level package.json.
+
+      at tryRequireResolve (node_modules/@babel/core/lib/config/files/plugins.js:128:11)
+      at resolveStandardizedNameForRequire (node_modules/@babel/core/lib/config/files/plugins.js:162:19)
+      at resolveStandardizedName (node_modules/@babel/core/lib/config/files/plugins.js:183:12)
+      at loadPreset (node_modules/@babel/core/lib/config/files/plugins.js:68:7)
+          at loadPreset.next (<anonymous>)
+      at createDescriptor (node_modules/@babel/core/lib/config/config-descriptors.js:140:16)
+          at createDescriptor.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at node_modules/gensync/index.js:31:34
+          at Array.map (<anonymous>)
+      at Function.sync (node_modules/gensync/index.js:31:22)
+      at Function.all (node_modules/gensync/index.js:210:24)
+      at createDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:102:41)
+          at createDescriptors.next (<anonymous>)
+      at createPresetDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:96:17)
+          at createPresetDescriptors.next (<anonymous>)
+      at node_modules/@babel/core/lib/gensync-utils/functional.js:22:27
+      at mergeChainOpts (node_modules/@babel/core/lib/config/config-chain.js:350:34)
+          at mergeChainOpts.next (<anonymous>)
+      at chainWalker (node_modules/@babel/core/lib/config/config-chain.js:316:14)
+          at chainWalker.next (<anonymous>)
+      at loadFileChain (node_modules/@babel/core/lib/config/config-chain.js:191:24)
+          at loadFileChain.next (<anonymous>)
+      at buildRootChain (node_modules/@babel/core/lib/config/config-chain.js:77:27)
+          at buildRootChain.next (<anonymous>)
+      at loadPrivatePartialConfig (node_modules/@babel/core/lib/config/partial.js:72:62)
+          at loadPrivatePartialConfig.next (<anonymous>)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/partial.js:115:25)
+          at loadPartialConfig.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at sync (node_modules/gensync/index.js:89:14)
+      at stopHiding - secret - don't use this - v1 (node_modules/@babel/core/lib/errors/rewrite-stack-trace.js:47:12)
+      at loadPartialConfigSync (node_modules/@babel/core/lib/config/index.js:37:84)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/index.js:45:12)
+      at ScriptTransformer._getCacheKey (node_modules/@jest/transform/build/ScriptTransformer.js:228:41)
+      at ScriptTransformer._getFileCachePath (node_modules/@jest/transform/build/ScriptTransformer.js:289:27)
+      at ScriptTransformer.transformSource (node_modules/@jest/transform/build/ScriptTransformer.js:525:32)
+      at revertHook.exts (node_modules/@jest/transform/build/ScriptTransformer.js:776:18)
+      at Module._compile (node_modules/pirates/lib/index.js:124:29)
+      at Object.newLoader (node_modules/pirates/lib/index.js:134:7)
+
+ FAIL  src/__tests__/engine/powerups.test.js
+  ● Test suite failed to run
+
+    Cannot find module 'babel-preset-expo'
+    Require stack:
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\plugins.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\InlineSnapshots.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\State.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-runtime\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\cli\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\run.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\bin\jest.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest\bin\jest.js
+
+    Make sure that all the Babel plugins and presets you are using
+    are defined as dependencies or devDependencies in your package.json
+    file. It's possible that the missing plugin is loaded by a preset
+    you are using that forgot to add the plugin to its dependencies: you
+    can workaround this problem by explicitly adding the missing package
+    to your top-level package.json.
+
+      at tryRequireResolve (node_modules/@babel/core/lib/config/files/plugins.js:128:11)
+      at resolveStandardizedNameForRequire (node_modules/@babel/core/lib/config/files/plugins.js:162:19)
+      at resolveStandardizedName (node_modules/@babel/core/lib/config/files/plugins.js:183:12)
+      at loadPreset (node_modules/@babel/core/lib/config/files/plugins.js:68:7)
+          at loadPreset.next (<anonymous>)
+      at createDescriptor (node_modules/@babel/core/lib/config/config-descriptors.js:140:16)
+          at createDescriptor.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at node_modules/gensync/index.js:31:34
+          at Array.map (<anonymous>)
+      at Function.sync (node_modules/gensync/index.js:31:22)
+      at Function.all (node_modules/gensync/index.js:210:24)
+      at createDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:102:41)
+          at createDescriptors.next (<anonymous>)
+      at createPresetDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:96:17)
+          at createPresetDescriptors.next (<anonymous>)
+      at node_modules/@babel/core/lib/gensync-utils/functional.js:22:27
+      at mergeChainOpts (node_modules/@babel/core/lib/config/config-chain.js:350:34)
+          at mergeChainOpts.next (<anonymous>)
+      at chainWalker (node_modules/@babel/core/lib/config/config-chain.js:316:14)
+          at chainWalker.next (<anonymous>)
+      at loadFileChain (node_modules/@babel/core/lib/config/config-chain.js:191:24)
+          at loadFileChain.next (<anonymous>)
+      at buildRootChain (node_modules/@babel/core/lib/config/config-chain.js:77:27)
+          at buildRootChain.next (<anonymous>)
+      at loadPrivatePartialConfig (node_modules/@babel/core/lib/config/partial.js:72:62)
+          at loadPrivatePartialConfig.next (<anonymous>)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/partial.js:115:25)
+          at loadPartialConfig.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at sync (node_modules/gensync/index.js:89:14)
+      at stopHiding - secret - don't use this - v1 (node_modules/@babel/core/lib/errors/rewrite-stack-trace.js:47:12)
+      at loadPartialConfigSync (node_modules/@babel/core/lib/config/index.js:37:84)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/index.js:45:12)
+      at ScriptTransformer._getCacheKey (node_modules/@jest/transform/build/ScriptTransformer.js:228:41)
+      at ScriptTransformer._getFileCachePath (node_modules/@jest/transform/build/ScriptTransformer.js:289:27)
+      at ScriptTransformer.transformSource (node_modules/@jest/transform/build/ScriptTransformer.js:525:32)
+      at revertHook.exts (node_modules/@jest/transform/build/ScriptTransformer.js:776:18)
+      at Module._compile (node_modules/pirates/lib/index.js:124:29)
+      at Object.newLoader (node_modules/pirates/lib/index.js:134:7)
+
+ FAIL  src/__tests__/engine/screenshake.test.js
+  ● Test suite failed to run
+
+    Cannot find module 'babel-preset-expo'
+    Require stack:
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\plugins.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\InlineSnapshots.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\State.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-runtime\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\cli\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\run.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\bin\jest.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest\bin\jest.js
+
+    Make sure that all the Babel plugins and presets you are using
+    are defined as dependencies or devDependencies in your package.json
+    file. It's possible that the missing plugin is loaded by a preset
+    you are using that forgot to add the plugin to its dependencies: you
+    can workaround this problem by explicitly adding the missing package
+    to your top-level package.json.
+
+      at tryRequireResolve (node_modules/@babel/core/lib/config/files/plugins.js:128:11)
+      at resolveStandardizedNameForRequire (node_modules/@babel/core/lib/config/files/plugins.js:162:19)
+      at resolveStandardizedName (node_modules/@babel/core/lib/config/files/plugins.js:183:12)
+      at loadPreset (node_modules/@babel/core/lib/config/files/plugins.js:68:7)
+          at loadPreset.next (<anonymous>)
+      at createDescriptor (node_modules/@babel/core/lib/config/config-descriptors.js:140:16)
+          at createDescriptor.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at node_modules/gensync/index.js:31:34
+          at Array.map (<anonymous>)
+      at Function.sync (node_modules/gensync/index.js:31:22)
+      at Function.all (node_modules/gensync/index.js:210:24)
+      at createDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:102:41)
+          at createDescriptors.next (<anonymous>)
+      at createPresetDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:96:17)
+          at createPresetDescriptors.next (<anonymous>)
+      at node_modules/@babel/core/lib/gensync-utils/functional.js:22:27
+      at mergeChainOpts (node_modules/@babel/core/lib/config/config-chain.js:350:34)
+          at mergeChainOpts.next (<anonymous>)
+      at chainWalker (node_modules/@babel/core/lib/config/config-chain.js:316:14)
+          at chainWalker.next (<anonymous>)
+      at loadFileChain (node_modules/@babel/core/lib/config/config-chain.js:191:24)
+          at loadFileChain.next (<anonymous>)
+      at buildRootChain (node_modules/@babel/core/lib/config/config-chain.js:77:27)
+          at buildRootChain.next (<anonymous>)
+      at loadPrivatePartialConfig (node_modules/@babel/core/lib/config/partial.js:72:62)
+          at loadPrivatePartialConfig.next (<anonymous>)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/partial.js:115:25)
+          at loadPartialConfig.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at sync (node_modules/gensync/index.js:89:14)
+      at stopHiding - secret - don't use this - v1 (node_modules/@babel/core/lib/errors/rewrite-stack-trace.js:47:12)
+      at loadPartialConfigSync (node_modules/@babel/core/lib/config/index.js:37:84)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/index.js:45:12)
+      at ScriptTransformer._getCacheKey (node_modules/@jest/transform/build/ScriptTransformer.js:228:41)
+      at ScriptTransformer._getFileCachePath (node_modules/@jest/transform/build/ScriptTransformer.js:289:27)
+      at ScriptTransformer.transformSource (node_modules/@jest/transform/build/ScriptTransformer.js:525:32)
+      at revertHook.exts (node_modules/@jest/transform/build/ScriptTransformer.js:776:18)
+      at Module._compile (node_modules/pirates/lib/index.js:124:29)
+      at Object.newLoader (node_modules/pirates/lib/index.js:134:7)
+
+ FAIL  src/__tests__/engine/collision.test.js
+  ● Test suite failed to run
+
+    Cannot find module 'babel-preset-expo'
+    Require stack:
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\plugins.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\config\files\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@babel\core\lib\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\InlineSnapshots.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\State.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-snapshot\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-runtime\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\cli\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\@jest\core\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\run.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\build\index.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest-cli\bin\jest.js
+    - C:\Users\sjroy\Source\galageaux\node_modules\jest\bin\jest.js
+
+    Make sure that all the Babel plugins and presets you are using
+    are defined as dependencies or devDependencies in your package.json
+    file. It's possible that the missing plugin is loaded by a preset
+    you are using that forgot to add the plugin to its dependencies: you
+    can workaround this problem by explicitly adding the missing package
+    to your top-level package.json.
+
+      at tryRequireResolve (node_modules/@babel/core/lib/config/files/plugins.js:128:11)
+      at resolveStandardizedNameForRequire (node_modules/@babel/core/lib/config/files/plugins.js:162:19)
+      at resolveStandardizedName (node_modules/@babel/core/lib/config/files/plugins.js:183:12)
+      at loadPreset (node_modules/@babel/core/lib/config/files/plugins.js:68:7)
+          at loadPreset.next (<anonymous>)
+      at createDescriptor (node_modules/@babel/core/lib/config/config-descriptors.js:140:16)
+          at createDescriptor.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at node_modules/gensync/index.js:31:34
+          at Array.map (<anonymous>)
+      at Function.sync (node_modules/gensync/index.js:31:22)
+      at Function.all (node_modules/gensync/index.js:210:24)
+      at createDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:102:41)
+          at createDescriptors.next (<anonymous>)
+      at createPresetDescriptors (node_modules/@babel/core/lib/config/config-descriptors.js:96:17)
+          at createPresetDescriptors.next (<anonymous>)
+      at node_modules/@babel/core/lib/gensync-utils/functional.js:22:27
+      at mergeChainOpts (node_modules/@babel/core/lib/config/config-chain.js:350:34)
+          at mergeChainOpts.next (<anonymous>)
+      at chainWalker (node_modules/@babel/core/lib/config/config-chain.js:316:14)
+          at chainWalker.next (<anonymous>)
+      at loadFileChain (node_modules/@babel/core/lib/config/config-chain.js:191:24)
+          at loadFileChain.next (<anonymous>)
+      at buildRootChain (node_modules/@babel/core/lib/config/config-chain.js:77:27)
+          at buildRootChain.next (<anonymous>)
+      at loadPrivatePartialConfig (node_modules/@babel/core/lib/config/partial.js:72:62)
+          at loadPrivatePartialConfig.next (<anonymous>)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/partial.js:115:25)
+          at loadPartialConfig.next (<anonymous>)
+      at evaluateSync (node_modules/gensync/index.js:251:28)
+      at sync (node_modules/gensync/index.js:89:14)
+      at stopHiding - secret - don't use this - v1 (node_modules/@babel/core/lib/errors/rewrite-stack-trace.js:47:12)
+      at loadPartialConfigSync (node_modules/@babel/core/lib/config/index.js:37:84)
+      at loadPartialConfig (node_modules/@babel/core/lib/config/index.js:45:12)
+      at ScriptTransformer._getCacheKey (node_modules/@jest/transform/build/ScriptTransformer.js:228:41)
+      at ScriptTransformer._getFileCachePath (node_modules/@jest/transform/build/ScriptTransformer.js:289:27)
+      at ScriptTransformer.transformSource (node_modules/@jest/transform/build/ScriptTransformer.js:525:32)
+      at revertHook.exts (node_modules/@jest/transform/build/ScriptTransformer.js:776:18)
+      at Module._compile (node_modules/pirates/lib/index.js:124:29)
+      at Object.newLoader (node_modules/pirates/lib/index.js:134:7)
+
+Test Suites: 12 failed, 12 total
+Tests:       0 total
+Snapshots:   0 total
+Time:        3.528 s
+Ran all test suites.

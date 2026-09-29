@@ -9,6 +9,7 @@ import {
   spawnLargeExplosion,
   spawnTrailParticle,
   spawnSparks,
+  spawnImpactEffect,
 } from '../../engine/particles';
 
 describe('particles', () => {
@@ -268,5 +269,86 @@ describe('particles', () => {
         expect(p.color).toBe(customColor);
       });
     });
+  });
+});
+
+describe('Phase 0 particle timing contracts', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  const makeParticle = (overrides = {}) => ({
+    x: 100, y: 200, vx: 100, vy: -50,
+    life: 0.8, maxLife: 0.8, radius: 4,
+    rotation: 0, rotationSpeed: 2,
+    ...overrides,
+  });
+
+  const advance = (particle, hz, seconds) => {
+    let particles = [particle];
+    for (let frame = 0; frame < Math.round(hz * seconds); frame++) {
+      particles = updateParticles(particles, 1 / hz);
+    }
+    return particles[0];
+  };
+
+  it.each([
+    ['ordinary explosion', () => spawnExplosionParticles(10, 20, 16)],
+    ['debris explosion', () => spawnExplosionParticles(10, 20, 30, 'debris')],
+    ['large explosion', () => spawnLargeExplosion(10, 20).particles],
+    ['impact', () => spawnImpactEffect(10, 20)],
+    ['sparks', () => spawnSparks(10, 20)],
+    ['trail', () => [spawnTrailParticle(10, 20)]],
+  ])('initializes %s from one lifetime and one initial radius', (_, create) => {
+    let sample = 0;
+    jest.spyOn(Math, 'random').mockImplementation(() => ((sample++ % 9) + 1) / 10);
+    create().forEach(particle => {
+      expect(particle.maxLife).toBe(particle.life);
+      expect(particle.initialRadius).toBe(particle.radius);
+    });
+  });
+
+  it.each([30, 60, 120])('uses elapsed lifetime for radius at %i Hz', hz => {
+    const updated = advance(makeParticle(), hz, 0.2);
+    expect(updated.life).toBeCloseTo(0.6, 10);
+    expect(updated.alpha).toBeCloseTo(0.75, 10);
+    expect(updated.radius).toBeCloseTo(4 * Math.sqrt(0.75), 10);
+    expect(updated.initialRadius).toBe(4);
+  });
+
+  it.each([30, 60, 120])('normalizes spark velocity decay at %i Hz', hz => {
+    const updated = advance(makeParticle({ type: 'spark' }), hz, 0.2);
+    expect(updated.vx).toBeCloseTo(100 * Math.pow(0.98, 12), 10);
+    expect(updated.vy).toBeCloseTo(-50 * Math.pow(0.98, 12), 10);
+  });
+
+  it('matches spark travel over equal elapsed time with different frame schedules', () => {
+    const reference = advance(makeParticle({ type: 'spark' }), 60, 0.2);
+    [30, 120].forEach(hz => {
+      const result = advance(makeParticle({ type: 'spark' }), hz, 0.2);
+      expect(result.x).toBeCloseTo(reference.x, 8);
+      expect(result.y).toBeCloseTo(reference.y, 8);
+    });
+    const singleStep = updateParticles([makeParticle({ type: 'spark' })], 0.2)[0];
+    expect(singleStep.x).toBeCloseTo(reference.x, 8);
+    expect(singleStep.y).toBeCloseTo(reference.y, 8);
+  });
+
+  it('keeps normalized life and radius bounded for inconsistent legacy data', () => {
+    const result = updateParticles([makeParticle({ life: 2, maxLife: 1 })], 0.1)[0];
+    expect(result.alpha).toBe(1);
+    expect(result.radius).toBe(4);
+    const invalidLifetime = updateParticles([makeParticle({ maxLife: 0 })], 0.1)[0];
+    expect(Number.isFinite(invalidLifetime.alpha)).toBe(true);
+    expect(Number.isFinite(invalidLifetime.radius)).toBe(true);
+  });
+
+  it('keeps existing particle counts, colors and input objects intact', () => {
+    expect(spawnExplosionParticles(0, 0, 16)).toHaveLength(24);
+    expect(spawnExplosionParticles(0, 0, 30, 'debris')).toHaveLength(60);
+    const particle = makeParticle({ color: '#123456' });
+    const result = updateParticles([particle], 0.2)[0];
+    expect(result.color).toBe('#123456');
+    expect(particle.radius).toBe(4);
+    expect(particle.life).toBe(0.8);
+    expect(particle).not.toHaveProperty('initialRadius');
   });
 });

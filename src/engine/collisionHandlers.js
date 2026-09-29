@@ -17,9 +17,10 @@ import enemiesConfig from '../config/enemies.json';
  */
 export function checkBulletEnemyCollisions(bullets, enemies, {
   onEnemyDestroyed,
+  onEnemyHit,
   comboCount = 0,
   bonusMultiplier = 1
-}) {
+} = {}) {
   const bulletPool = [...bullets];
   const bulletConsumed = new Array(bulletPool.length).fill(false);
   const survivingEnemies = [];
@@ -33,7 +34,9 @@ export function checkBulletEnemyCollisions(bullets, enemies, {
   let newCombo = comboCount;
 
   enemies.forEach(enemy => {
-    let hitIndex = -1;
+    const cfg = enemiesConfig[enemy.type] || enemiesConfig['grunt'];
+    let nextEnemy = enemy;
+    let hit = false;
     for (let i = 0; i < bulletPool.length; i++) {
       const bullet = bulletPool[i];
       if (!bullet || bulletConsumed[i]) continue;
@@ -43,16 +46,17 @@ export function checkBulletEnemyCollisions(bullets, enemies, {
           { x: enemy.x, y: enemy.y, width: enemy.size, height: enemy.size }
         )
       ) {
-        hitIndex = i;
-        break;
+        bulletConsumed[i] = true;
+        hit = true;
+        nextEnemy = { ...nextEnemy, hp: Math.max(0, (nextEnemy.hp ?? cfg.hp) - 1) };
+        onEnemyHit?.(nextEnemy, bullet);
+        if (nextEnemy.hp === 0) break;
       }
     }
 
-    if (hitIndex >= 0) {
-      bulletConsumed[hitIndex] = true;
+    if (hit && nextEnemy.hp === 0) {
       const centerX = enemy.x + enemy.size / 2;
       const centerY = enemy.y + enemy.size / 2;
-      const cfg = enemiesConfig[enemy.type] || enemiesConfig['grunt'];
       const enemyColor = cfg.color || '#38bdf8';
       
       // Spawn effects
@@ -68,7 +72,7 @@ export function checkBulletEnemyCollisions(bullets, enemies, {
       
       // Calculate score with combo multiplier
       const comboMultiplier = newCombo >= 5 ? 2 : newCombo >= 3 ? 1.5 : newCombo >= 2 ? 1.25 : 1;
-      const points = Math.floor(cfg.score * comboMultiplier * bonusMultiplier);
+      const points = Math.floor(cfg.points * comboMultiplier * bonusMultiplier);
       scoreGain += points;
       
       // Create score text
@@ -83,10 +87,10 @@ export function checkBulletEnemyCollisions(bullets, enemies, {
       
       // Call destroy callback if provided
       if (onEnemyDestroyed) {
-        onEnemyDestroyed(enemy, newCombo, points);
+        onEnemyDestroyed(nextEnemy, newCombo, points);
       }
     } else {
-      survivingEnemies.push(enemy);
+      survivingEnemies.push(nextEnemy);
     }
   });
 

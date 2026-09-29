@@ -40,6 +40,7 @@ export function createBoss(stageKey, width) {
     targetY: cfg.enterY,
     speed: cfg.speed,
     phaseIndex: 0,
+    elapsedTime: 0,
     fireCooldown: 1.2,
     alive: true
   };
@@ -57,14 +58,22 @@ export function updateBoss(boss, dt, stageKey) {
   const cfg = bossConfig[stageKey];
   if (!cfg) return boss;
 
+  const previousTime = boss.elapsedTime || 0;
+  boss.elapsedTime = previousTime + dt;
+  let entranceTime = 0;
   // Entrance phase: move down to target position
   if (boss.y < boss.targetY) {
-    boss.y += boss.speed * dt;
-  } else {
-    // Combat phase: oscillate horizontally
-    boss.x += Math.sin(Date.now() / 600) * 20 * dt;
+    entranceTime = Math.min(dt, (boss.targetY - boss.y) / boss.speed);
+    boss.y = Math.min(boss.targetY, boss.y + boss.speed * dt);
+  }
+  if (entranceTime < dt) {
+    // Integrate the existing sine velocity exactly using simulation time.
+    // This preserves its 20-unit/s speed and ~12-unit oscillation amplitude.
+    boss.x += 12 * (Math.cos((previousTime + entranceTime) / 0.6) - Math.cos(boss.elapsedTime / 0.6));
   }
 
+  // Preserve the existing entrance-fire policy. This is the sole owner of
+  // cooldown elapsed time; the caller only emits/reset volleys when due.
   boss.fireCooldown -= dt;
   return boss;
 }
@@ -79,9 +88,10 @@ export function updateBoss(boss, dt, stageKey) {
 export function bossCurrentPattern(boss, stageKey) {
   const cfg = bossConfig[stageKey];
   if (!cfg) return 'radial';
-  const hpRatio = boss.hp / boss.maxHp;
+  // Configuration thresholds are absolute HP lower bounds. Reaching a
+  // threshold enters the next phase (the existing strict-boundary policy).
   for (const phase of cfg.phases) {
-    if (hpRatio * 100 > phase.hpThreshold) {
+    if (boss.hp > phase.hpThreshold) {
       return phase.pattern;
     }
   }

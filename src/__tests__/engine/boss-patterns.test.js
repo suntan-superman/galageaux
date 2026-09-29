@@ -13,7 +13,7 @@ import {
   updateBossSwoop,
 } from '../../engine/boss-patterns';
 
-// Mock boss config
+// Mock boss config. Thresholds use the production absolute-HP contract.
 jest.mock('../../config/boss.json', () => ({
   stage1: {
     name: 'Test Boss',
@@ -21,9 +21,9 @@ jest.mock('../../config/boss.json', () => ({
     bulletSpeed: 200,
     fireRate: 1.5,
     phases: [
-      { hpThreshold: 75, pattern: 'spread' },
-      { hpThreshold: 50, pattern: 'burst' },
-      { hpThreshold: 25, pattern: 'spiral' },
+      { hpThreshold: 750, pattern: 'spread' },
+      { hpThreshold: 500, pattern: 'burst' },
+      { hpThreshold: 250, pattern: 'spiral' },
     ],
     swoopEnabled: true,
   },
@@ -33,8 +33,8 @@ jest.mock('../../config/boss.json', () => ({
     bulletSpeed: 250,
     fireRate: 1.2,
     phases: [
-      { hpThreshold: 60, pattern: 'radial' },
-      { hpThreshold: 30, pattern: 'aimed' },
+      { hpThreshold: 900, pattern: 'radial' },
+      { hpThreshold: 450, pattern: 'aimed' },
     ],
     swoopEnabled: false,
   },
@@ -231,22 +231,17 @@ describe('boss-patterns', () => {
       expect(result).toBe(false);
     });
 
-    // Note: Random chance means we can't deterministically test true case
-    it('has chance to swoop when HP below 50% and enabled', () => {
+    it('uses the 2% random boundary when HP below 50% and enabled', () => {
       const boss = { hp: 300, maxHp: 1000 }; // 30% HP
-      
-      // Run multiple times to statistically test
-      let swoopTriggered = false;
-      for (let i = 0; i < 100; i++) {
-        if (shouldBossSwoop(boss, 'stage1', 400, 800)) {
-          swoopTriggered = true;
-          break;
-        }
+      const random = jest.spyOn(Math, 'random');
+      try {
+        random.mockReturnValue(0.019);
+        expect(shouldBossSwoop(boss, 'stage1', 400, 800)).toBe(true);
+        random.mockReturnValue(0.02);
+        expect(shouldBossSwoop(boss, 'stage1', 400, 800)).toBe(false);
+      } finally {
+        random.mockRestore();
       }
-      
-      // With 2% chance per call, should trigger at least once in 100 tries
-      // This may occasionally fail (~13% of the time) but is statistically likely to pass
-      expect(swoopTriggered).toBe(true);
     });
   });
 

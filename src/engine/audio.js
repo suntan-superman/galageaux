@@ -53,6 +53,7 @@ const audioState = {
   sounds: {},
   music: null,
   currentTrack: null,
+  musicPaused: false,
   loadedSounds: 0,
   totalSounds: 0,
   failedSounds: [],
@@ -62,6 +63,7 @@ const audioState = {
   lazyLoadQueue: [],
   isLazyLoading: false
 };
+let pendingMusicPause = null;
 
 // Sound effect definitions with priority
 // Priority 1: Critical (needed immediately for gameplay)
@@ -342,8 +344,20 @@ export async function playSound(soundName, volumeMultiplier = 1.0) {
  * @returns {Promise<void>}
  */
 export async function playMusic(trackName, loop = true) {
+  // Screen cleanup cannot await native pause before another screen reenters.
+  // Wait here so that a late pause cannot silence the newly requested playback.
+  if (pendingMusicPause) await pendingMusicPause;
   if (!audioState.musicEnabled || !audioState.initialized) return;
-  if (audioState.currentTrack === trackName && audioState.music) return;
+  // Reject stale/unknown keys without tearing down the valid current track.
+  const musicFile = MUSIC_FILES[trackName];
+  if (!musicFile) {
+    console.warn(`Music track not found: ${trackName}`);
+    return;
+  }
+  if (audioState.currentTrack === trackName && audioState.music) {
+    if (audioState.musicPaused) await resumeMusic();
+    return;
+  }
 
   try {
     // Stop current music
@@ -353,18 +367,13 @@ export async function playMusic(trackName, loop = true) {
     }
 
     // Load and play new track
-    const musicFile = MUSIC_FILES[trackName];
-    if (!musicFile) {
-      console.warn(`Music track not found: ${trackName}`);
-      return;
-    }
-    
     const { sound } = await Audio.Sound.createAsync(
       musicFile,
       { shouldPlay: true, isLooping: loop, volume: audioState.musicVolume }
     );
     audioState.music = sound;
     audioState.currentTrack = trackName;
+    audioState.musicPaused = false;
   } catch (error) {
     console.warn(`Failed to play music: ${trackName}`, error);
     // Use a fallback empty sound object
@@ -389,6 +398,7 @@ export async function stopMusic() {
     await audioState.music.unloadAsync();
     audioState.music = null;
     audioState.currentTrack = null;
+    audioState.musicPaused = false;
   } catch (error) {
     console.warn('Failed to stop music:', error);
   }
@@ -399,11 +409,21 @@ export async function stopMusic() {
  */
 export async function pauseMusic() {
   if (!audioState.music) return;
+  if (pendingMusicPause) return pendingMusicPause;
 
+  const music = audioState.music;
+  pendingMusicPause = (async () => {
+    try {
+      await music.pauseAsync();
+      if (audioState.music === music) audioState.musicPaused = true;
+    } catch (error) {
+      console.warn('Failed to pause music:', error);
+    }
+  })();
   try {
-    await audioState.music.pauseAsync();
-  } catch (error) {
-    console.warn('Failed to pause music:', error);
+    await pendingMusicPause;
+  } finally {
+    pendingMusicPause = null;
   }
 }
 
@@ -415,6 +435,7 @@ export async function resumeMusic() {
 
   try {
     await audioState.music.playAsync();
+    audioState.musicPaused = false;
   } catch (error) {
     console.warn('Failed to resume music:', error);
   }
@@ -507,6 +528,7 @@ export async function cleanupAudio() {
     audioState.sounds = {};
     audioState.music = null;
     audioState.currentTrack = null;
+    audioState.musicPaused = false;
   } catch (error) {
     console.error('Failed to cleanup audio:', error);
   }

@@ -47,7 +47,8 @@ export function triggerScreenshake(state, intensity = 6, duration = 0.18) {
  */
 export function updateScreenshake(state, dt) {
   if (state.time <= 0) return { ox: 0, oy: 0 };
-  state.time -= dt;
+  state.time = Math.max(0, state.time - dt);
+  if (state.time === 0) return { ox: 0, oy: 0 };
   const progress = state.time / state.duration;
   const falloff = progress * state.intensity;
   const ox = (Math.random() * 2 - 1) * falloff;

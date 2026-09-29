@@ -42,11 +42,10 @@ export function createBossPatterns(stageKey) {
 export function getBossPattern(state, boss) {
   if (!state || !boss) return 'radial';
   
-  const hpRatio = boss.hp / boss.maxHp;
   const phases = state.config.phases || [];
   
   for (const phase of phases) {
-    if (hpRatio * 100 > phase.hpThreshold) {
+    if (boss.hp > phase.hpThreshold) {
       return phase.pattern || 'radial';
     }
   }
@@ -63,6 +62,7 @@ export function getBossPattern(state, boss) {
  * @returns {Object} Bullet entity
  */
 export function createBossBullet(cx, cy, angle, speed) {
+  // Screen coordinates: +X right, +Y down; angle zero points down.
   const vx = Math.sin(angle) * speed;
   const vy = Math.cos(angle) * speed;
   return {
@@ -70,7 +70,7 @@ export function createBossBullet(cx, cy, angle, speed) {
     y: cy,
     width: BULLET_WIDTH,
     height: BULLET_HEIGHT,
-    speed: Math.abs(vy),
+    speed,
     vx,
     vy
   };
@@ -110,24 +110,24 @@ export function generateBossBullets(boss, pattern, stageKey, playerX, playerY) {
   } else if (pattern === 'spread') {
     const angles = [-0.6, -0.4, -0.2, 0, 0.2, 0.4, 0.6];
     angles.forEach(angle => {
-      bullets.push(createBossBullet(cx, cy, angle + Math.PI, bulletSpeed));
+      bullets.push(createBossBullet(cx, cy, angle, bulletSpeed));
     });
   } else if (pattern === 'burst') {
     const count = 8;
-    const baseAngle = Math.atan2(playerY - cy, playerX - cx) + Math.PI;
+    const baseAngle = Math.atan2(playerX - cx, playerY - cy);
     for (let i = 0; i < count; i++) {
       const angle = baseAngle - 0.3 + (i * 0.6) / (count - 1);
       bullets.push(createBossBullet(cx, cy, angle, bulletSpeed));
     }
   } else if (pattern === 'spiral') {
     const count = 6;
-    const baseAngle = Date.now() / 1000 * 2;
+    const baseAngle = (boss.elapsedTime || 0) * 2;
     for (let i = 0; i < count; i++) {
       const angle = baseAngle + (i * Math.PI * 2) / count + Math.PI;
       bullets.push(createBossBullet(cx, cy, angle, bulletSpeed));
     }
   } else if (pattern === 'aimed') {
-    const angle = Math.atan2(playerY - cy, playerX - cx) + Math.PI;
+    const angle = Math.atan2(playerX - cx, playerY - cy);
     bullets.push(createBossBullet(cx, cy, angle, bulletSpeed * 1.2));
   }
   

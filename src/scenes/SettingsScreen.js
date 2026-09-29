@@ -16,7 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as AudioManager from '../engine/audio';
-import { STORAGE_KEYS } from '../constants/game';
+import { PLAYER, STORAGE_KEYS } from '../constants/game';
+import { normalizeTiltSensitivity } from '../engine/inputSettings';
 import { APP_INFO, getCopyrightText } from '../../constants/appInfo';
 
 export default function SettingsScreen({ onBack }) {
@@ -28,7 +29,7 @@ export default function SettingsScreen({ onBack }) {
   
   // Control settings
   const [tiltEnabled, setTiltEnabled] = useState(false);
-  const [tiltSensitivity, setTiltSensitivity] = useState(1.5);
+  const [tiltSensitivity, setTiltSensitivity] = useState(PLAYER.TILT_SENSITIVITY_DEFAULT);
   const [fireButtonPosition, setFireButtonPosition] = useState('right');
   const [autoFire, setAutoFire] = useState(false);
   
@@ -52,7 +53,7 @@ export default function SettingsScreen({ onBack }) {
       // Load control settings
       const tiltVal = await AsyncStorage.getItem(STORAGE_KEYS.TILT_SENSITIVITY);
       if (tiltVal) {
-        setTiltSensitivity(parseFloat(tiltVal));
+        setTiltSensitivity(normalizeTiltSensitivity(tiltVal));
         setTiltEnabled(true);
       }
 
@@ -65,20 +66,21 @@ export default function SettingsScreen({ onBack }) {
     }
   };
 
-  const saveAudioSettings = async () => {
+  const saveAudioSettings = async (updates = {}) => {
     const settings = {
       soundsEnabled,
       musicEnabled,
       soundVolume,
-      musicVolume
+      musicVolume,
+      ...updates,
     };
-    await AsyncStorage.setItem(STORAGE_KEYS.AUDIO_SETTINGS, JSON.stringify(settings));
     
     // Apply to audio manager
-    AudioManager.setSoundsEnabled(soundsEnabled);
-    AudioManager.setMusicEnabled(musicEnabled);
-    AudioManager.setSoundVolume(soundVolume);
-    AudioManager.setMusicVolume(musicVolume);
+    AudioManager.setSoundsEnabled(settings.soundsEnabled);
+    AudioManager.setMusicEnabled(settings.musicEnabled);
+    AudioManager.setSoundVolume(settings.soundVolume);
+    AudioManager.setMusicVolume(settings.musicVolume);
+    await AsyncStorage.setItem(STORAGE_KEYS.AUDIO_SETTINGS, JSON.stringify(settings));
   };
 
   const handleSoundsToggle = (value) => {
@@ -87,7 +89,7 @@ export default function SettingsScreen({ onBack }) {
     if (value) {
       AudioManager.playSound('uiClick', 0.5);
     }
-    saveAudioSettings();
+    saveAudioSettings({ soundsEnabled: value });
   };
 
   const handleMusicToggle = (value) => {
@@ -98,7 +100,7 @@ export default function SettingsScreen({ onBack }) {
     } else {
       AudioManager.stopMusic();
     }
-    saveAudioSettings();
+    saveAudioSettings({ musicEnabled: value });
   };
 
   const handleSoundVolumeChange = (value) => {
@@ -106,9 +108,9 @@ export default function SettingsScreen({ onBack }) {
     AudioManager.setSoundVolume(value);
   };
 
-  const handleSoundVolumeComplete = () => {
+  const handleSoundVolumeComplete = (value = soundVolume) => {
     AudioManager.playSound('uiClick', 0.5);
-    saveAudioSettings();
+    saveAudioSettings({ soundVolume: value });
   };
 
   const handleMusicVolumeChange = (value) => {
@@ -116,13 +118,14 @@ export default function SettingsScreen({ onBack }) {
     AudioManager.setMusicVolume(value);
   };
 
-  const handleMusicVolumeComplete = () => {
-    saveAudioSettings();
+  const handleMusicVolumeComplete = (value = musicVolume) => {
+    saveAudioSettings({ musicVolume: value });
   };
 
   const handleTiltSensitivityChange = async (value) => {
-    setTiltSensitivity(value);
-    await AsyncStorage.setItem(STORAGE_KEYS.TILT_SENSITIVITY, String(value));
+    const sensitivity = normalizeTiltSensitivity(value);
+    setTiltSensitivity(sensitivity);
+    await AsyncStorage.setItem(STORAGE_KEYS.TILT_SENSITIVITY, String(sensitivity));
   };
 
   const handleFirePositionToggle = async () => {
@@ -138,7 +141,7 @@ export default function SettingsScreen({ onBack }) {
     setMusicEnabled(true);
     setSoundVolume(0.7);
     setMusicVolume(0.5);
-    setTiltSensitivity(1.5);
+    setTiltSensitivity(PLAYER.TILT_SENSITIVITY_DEFAULT);
     setFireButtonPosition('right');
     setAutoFire(false);
     
@@ -270,8 +273,8 @@ export default function SettingsScreen({ onBack }) {
             <Text style={styles.sliderLabel}>Tilt Sensitivity</Text>
             <Slider
               style={styles.slider}
-              minimumValue={0.5}
-              maximumValue={3}
+              minimumValue={PLAYER.TILT_SENSITIVITY_MIN}
+              maximumValue={PLAYER.TILT_SENSITIVITY_MAX}
               value={tiltSensitivity}
               onValueChange={handleTiltSensitivityChange}
               minimumTrackTintColor="#fbbf24"

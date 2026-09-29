@@ -1,5 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
+import { PLAYER } from '../constants/game';
+import { normalizeTiltSensitivity } from '../engine/inputSettings';
 
 export default function PauseOverlay({
   visible,
@@ -23,6 +25,10 @@ export default function PauseOverlay({
   onChangeMusicVolume
 }) {
   if (!visible) return null;
+  const sensitivity = normalizeTiltSensitivity(tiltSensitivity);
+  const adjustSensitivity = amount => onChangeTiltSensitivity(
+    normalizeTiltSensitivity(Math.round((sensitivity + amount) * 10) / 10),
+  );
 
   return (
     <View style={styles.overlay} pointerEvents="auto">
@@ -56,17 +62,17 @@ export default function PauseOverlay({
           <Text style={styles.sectionLabel}>Tilt Sensitivity</Text>
           <View style={styles.sensitivityRow}>
             <TouchableOpacity
-              style={[styles.adjustButton, tiltSensitivity <= 1 && styles.adjustButtonDisabled]}
-              onPress={() => onChangeTiltSensitivity(Math.max(1, tiltSensitivity - 1))}
-              disabled={tiltSensitivity <= 1}
+              style={[styles.adjustButton, sensitivity <= PLAYER.TILT_SENSITIVITY_MIN && styles.adjustButtonDisabled]}
+              onPress={() => adjustSensitivity(-0.1)}
+              disabled={sensitivity <= PLAYER.TILT_SENSITIVITY_MIN}
             >
               <Text style={styles.adjustButtonText}>-</Text>
             </TouchableOpacity>
-            <Text style={styles.sensitivityValue}>{tiltSensitivity}</Text>
+            <Text style={styles.sensitivityValue}>{sensitivity.toFixed(1)}</Text>
             <TouchableOpacity
-              style={[styles.adjustButton, tiltSensitivity >= 10 && styles.adjustButtonDisabled]}
-              onPress={() => onChangeTiltSensitivity(Math.min(10, tiltSensitivity + 1))}
-              disabled={tiltSensitivity >= 10}
+              style={[styles.adjustButton, sensitivity >= PLAYER.TILT_SENSITIVITY_MAX && styles.adjustButtonDisabled]}
+              onPress={() => adjustSensitivity(0.1)}
+              disabled={sensitivity >= PLAYER.TILT_SENSITIVITY_MAX}
             >
               <Text style={styles.adjustButtonText}>+</Text>
             </TouchableOpacity>

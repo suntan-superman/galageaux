@@ -158,8 +158,8 @@ export default function PlayerShip({
       
       {/* Main thruster - enhanced with multiple layers */}
       <Rect
-        x={centerX - flameWidth / 2 + ox}
-        y={shipY + shipH + oy}
+        x={centerX - flameWidth / 2}
+        y={shipY + shipH}
         width={flameWidth}
         height={flameLength}
         color="rgba(14,165,233,0.8)"
@@ -174,21 +174,21 @@ export default function PlayerShip({
       {/* Thruster core with pulsing effect */}
       <Circle 
         cx={centerX} 
-        cy={shipY + shipH + flameLength * 0.5 + oy} 
+        cy={shipY + shipH + flameLength * 0.5}
         r={flameWidth * 0.45} 
         color="rgba(248,250,252,0.7)" 
       />
       <Circle 
         cx={centerX} 
-        cy={shipY + shipH + flameLength * 0.5 + oy} 
+        cy={shipY + shipH + flameLength * 0.5}
         r={flameWidth * 0.25} 
         color="rgba(139,92,246,0.9)" 
       />
       
       {/* Side maneuvering thrusters - enhanced */}
       <Rect
-        x={centerX - shipW * 0.32 - 2.5 + ox}
-        y={shipY + shipH * 0.72 + oy}
+        x={centerX - shipW * 0.32 - 2.5}
+        y={shipY + shipH * 0.72}
         width={5}
         height={flameLength * 0.5}
         color="rgba(14,165,233,0.5)"
@@ -200,8 +200,8 @@ export default function PlayerShip({
         />
       </Rect>
       <Rect
-        x={centerX + shipW * 0.27 - 2.5 + ox}
-        y={shipY + shipH * 0.72 + oy}
+        x={centerX + shipW * 0.27 - 2.5}
+        y={shipY + shipH * 0.72}
         width={5}
         height={flameLength * 0.5}
         color="rgba(14,165,233,0.5)"

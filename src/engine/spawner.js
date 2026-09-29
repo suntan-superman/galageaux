@@ -12,6 +12,8 @@ import enemiesConfig from '../config/enemies.json';
  * @property {number} width - Screen width
  * @property {number} enemySpeed - Base enemy speed for current level
  * @property {string[]} patterns - Available movement patterns for the stage
+ * @property {string[]} [enemyTypes] - Allowed types from the active stage
+ * @property {function} [random] - Random source for repeatable simulation tests
  */
 
 /**
@@ -34,13 +36,13 @@ import enemiesConfig from '../config/enemies.json';
  * Determines spawn probability for each enemy type
  */
 const ENEMY_WEIGHTS = {
-  elite: { threshold: 0.95, canShoot: true },     // 5% - rapid fire
-  tank: { threshold: 0.90, canShoot: false },     // 5% - slow, high HP
-  kamikaze: { threshold: 0.85, canShoot: false }, // 5% - chase player
-  scout: { threshold: 0.75, canShoot: true },     // 10% - fast
-  shooter: { threshold: 0.60, canShoot: true },   // 15% - shoots
-  dive: { threshold: 0.40, canShoot: true },      // 20% - dive pattern
-  grunt: { threshold: 0.00, canShoot: false }     // 40% - basic
+  elite: { weight: 0.05, canShoot: true },
+  tank: { weight: 0.05, canShoot: false },
+  kamikaze: { weight: 0.05, canShoot: false },
+  scout: { weight: 0.10, canShoot: true },
+  shooter: { weight: 0.15, canShoot: true },
+  dive: { weight: 0.20, canShoot: true },
+  grunt: { weight: 0.40, canShoot: false }
 };
 
 /**
@@ -48,13 +50,22 @@ const ENEMY_WEIGHTS = {
  * @param {number} roll - Random number between 0-1
  * @returns {{ type: string, canShoot: boolean }}
  */
-export function selectEnemyType(roll = Math.random()) {
-  for (const [type, config] of Object.entries(ENEMY_WEIGHTS)) {
-    if (roll > config.threshold) {
-      return { type, canShoot: config.canShoot };
+export function selectEnemyType(roll = Math.random(), enemyTypes) {
+  // Restrict and renormalize the existing seven-type distribution. Merely
+  // listing a dormant configured type does not activate its missing behavior.
+  const choices = Object.entries(ENEMY_WEIGHTS)
+    .filter(([type]) => !enemyTypes || enemyTypes.includes(type));
+  const totalWeight = choices.reduce((sum, [, config]) => sum + config.weight, 0);
+  let threshold = totalWeight;
+  const target = Math.max(0, Math.min(1, roll)) * totalWeight;
+  for (let index = 0; index < choices.length; index++) {
+    const [type, config] = choices[index];
+    threshold -= config.weight;
+    if (target > threshold || index === choices.length - 1) {
+      return { type, canShoot: enemiesConfig[type].canShoot ?? config.canShoot };
     }
   }
-  return { type: 'grunt', canShoot: false };
+  return null;
 }
 
 /**
@@ -68,19 +79,23 @@ export function selectEnemyType(roll = Math.random()) {
  * @param {boolean} options.canShoot - Whether enemy can fire
  * @returns {Enemy}
  */
-export function createEnemy({ type, x, y, baseSpeed, pattern, canShoot }) {
+export function createEnemy({ type, x, y, baseSpeed, pattern, canShoot, random = Math.random }) {
   const cfg = enemiesConfig[type] || enemiesConfig['grunt'];
+  const speed = baseSpeed * (cfg.speed ?? 1);
   return {
     type,
     x,
     y,
     baseX: x,
-    size: ENEMY_SIZE,
-    speed: baseSpeed * (cfg.speedMultiplier || 1),
+    size: cfg.size ?? ENEMY_SIZE,
+    speed,
+    // Preserve the resolved per-type speed for temporary slow effects.
+    baseSpeed: speed,
     hp: cfg.hp,
     pattern,
-    canShoot,
-    fireCooldown: Math.random() * 1.5 + 0.5,
+    // Explicit JSON flags win; omitted flags preserve the live type default.
+    canShoot: cfg.canShoot ?? canShoot ?? ENEMY_WEIGHTS[type]?.canShoot ?? false,
+    fireCooldown: random() * 1.5 + 0.5,
     behavior: cfg.behavior || 'normal'
   };
 }
@@ -92,7 +107,7 @@ export function createEnemy({ type, x, y, baseSpeed, pattern, canShoot }) {
  * @returns {Enemy[]}
  */
 export function spawnWave(config, onSpawnCount) {
-  const roll = Math.random();
+  const roll = (config.random || Math.random)();
   if (roll < 0.3) return spawnFormation('v', config, onSpawnCount);
   if (roll < 0.6) return spawnFormation('line', config, onSpawnCount);
   return spawnSingleEnemy(config, onSpawnCount);
@@ -106,7 +121,7 @@ export function spawnWave(config, onSpawnCount) {
  * @returns {Enemy[]}
  */
 export function spawnFormation(type, config, onSpawnCount) {
-  const { width, enemySpeed } = config;
+  const { width, enemySpeed, enemyTypes, random = Math.random } = config;
   const created = [];
   const count = 5;
   const offsets = getFormationOffsets(type, count);
@@ -114,8 +129,11 @@ export function spawnFormation(type, config, onSpawnCount) {
   const yStart = -ENEMY_SIZE * 2;
   
   offsets.forEach((off, idx) => {
-    const { type: enemyType, canShoot } = selectEnemyType();
-    const x = baseX + off.dx - ENEMY_SIZE / 2;
+    const selected = selectEnemyType(random(), enemyTypes);
+    if (!selected) return;
+    const { type: enemyType, canShoot } = selected;
+    const size = enemiesConfig[enemyType].size ?? ENEMY_SIZE;
+    const x = baseX + off.dx - size / 2;
     
     created.push(createEnemy({
       type: enemyType,
@@ -123,7 +141,8 @@ export function spawnFormation(type, config, onSpawnCount) {
       y: yStart + off.dy - idx * 8,
       baseSpeed: enemySpeed,
       pattern: type === 'v' ? 'dive' : 'zigzag',
-      canShoot
+      canShoot,
+      random
     }));
     
     onSpawnCount?.(1);
@@ -139,20 +158,24 @@ export function spawnFormation(type, config, onSpawnCount) {
  * @returns {Enemy[]}
  */
 export function spawnSingleEnemy(config, onSpawnCount) {
-  const { width, enemySpeed, patterns } = config;
+  const { width, enemySpeed, patterns = ['line'], enemyTypes, random = Math.random } = config;
   const created = [];
   const pad = 20;
-  const pattern = patterns[Math.floor(Math.random() * patterns.length)];
-  const { type, canShoot } = selectEnemyType();
-  const x = pad + Math.random() * (width - pad * 2 - ENEMY_SIZE);
+  const pattern = patterns[Math.floor(random() * patterns.length)] || 'line';
+  const selected = selectEnemyType(random(), enemyTypes);
+  if (!selected) return created;
+  const { type, canShoot } = selected;
+  const size = enemiesConfig[type].size ?? ENEMY_SIZE;
+  const x = pad + random() * Math.max(0, width - pad * 2 - size);
   
   created.push(createEnemy({
     type,
     x,
-    y: -ENEMY_SIZE,
+    y: -size,
     baseSpeed: enemySpeed,
     pattern,
-    canShoot
+    canShoot,
+    random
   }));
   
   onSpawnCount?.(1);
@@ -175,7 +198,9 @@ export function createEnemyBullet(enemy, bulletWidth, bulletHeight, speed) {
     y: cy,
     width: bulletWidth,
     height: bulletHeight,
-    speed
+    speed,
+    vx: 0,
+    vy: speed
   };
 }
 

@@ -142,11 +142,12 @@ let achievementState = {
   },
   loaded: false
 };
+let loadingAchievements = null;
 
 /**
  * Load achievements and stats from storage
  */
-export async function loadAchievements() {
+async function readAchievements() {
   try {
     const [achievementsData, statsData] = await Promise.all([
       AsyncStorage.getItem(STORAGE_KEY),
@@ -165,6 +166,17 @@ export async function loadAchievements() {
   } catch (error) {
     console.error('Failed to load achievements:', error);
   }
+}
+
+export function loadAchievements() {
+  // Startup and the first gameplay update can request the same stored snapshot.
+  // Share that read so a late response cannot overwrite already-applied deltas.
+  if (!loadingAchievements) {
+    loadingAchievements = readAchievements().finally(() => {
+      loadingAchievements = null;
+    });
+  }
+  return loadingAchievements;
 }
 
 /**
