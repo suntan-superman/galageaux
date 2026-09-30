@@ -29,13 +29,22 @@ import { STAGES } from '../constants/game';
 import useGameSettings from '../hooks/useGameSettings';
 import useStarField from '../hooks/useStarField';
 import usePlayerControls from '../hooks/usePlayerControls';
+import { isCaptureStudioEnabled } from '../dev/captureGate';
 
 const FIRST_PLAY_CUE_KEY = 'galageaux:firstPlayCueSeen';
 
-export default function GameScreen({ onExit, showTutorial = false, showFirstPlayCue = false }) {
+export default function GameScreen({ onExit, showTutorial = false, showFirstPlayCue = false, captureSession = null }) {
   const { width, height } = useWindowDimensions();
+  // Capture injection is inert in every production build and every non-opted-in dev run.
+  const captureActive = isCaptureStudioEnabled() && !!captureSession?.initialState;
+  const captureFrozen = captureActive && captureSession.timeScale === 0;
+  if (captureActive && (typeof captureSession.random !== 'function'
+    || typeof captureSession.starRandom !== 'function')) {
+    throw new Error('Capture Studio requires seeded gameplay and starfield RNG streams');
+  }
   const sessionRef = useRef(null);
-  if (!sessionRef.current) sessionRef.current = createGameSession(width, height, showTutorial);
+  if (!sessionRef.current) sessionRef.current = captureActive
+    ? captureSession.initialState : createGameSession(width, height, showTutorial);
   const presentationRef = useRef(null);
   if (!presentationRef.current) presentationRef.current = createPresentationState(sessionRef.current);
   const [snapshot, setSnapshot] = useState(sessionRef.current);
@@ -52,7 +61,8 @@ export default function GameScreen({ onExit, showTutorial = false, showFirstPlay
   const lastTimeRef = useRef(null);
   const fireHeldRef = useRef(false);
   const frameRef = useRef(null);
-  const { stars, updateStars, resetStars } = useStarField(width, height);
+  const { stars, updateStars, resetStars } = useStarField(width, height, 100,
+    captureActive ? captureSession.starRandom : Math.random);
   const {
     tiltSensitivity, fireButtonPosition, audioSettings, loaded,
     handleTiltSensitivityChange, handleFireButtonPositionChange, handleToggleSounds,
@@ -88,6 +98,8 @@ export default function GameScreen({ onExit, showTutorial = false, showFirstPlay
   const consumeEvents = (events, state) => {
     if (!events.length) return;
     Promise.resolve(playGameEventSounds(events)).catch(error => console.warn('Game audio event failed:', error));
+    // Capture runs are real simulation, but must never enter lifetime achievements/stats.
+    if (captureActive) return;
     const updates = getAchievementUpdates(events, state);
     if (!Object.keys(updates).length) return;
     const sessionId = state.sessionId;
@@ -107,7 +119,12 @@ export default function GameScreen({ onExit, showTutorial = false, showFirstPlay
     setSnapshot(result.state);
     consumeEvents(result.events, result.state);
   };
-  const command = action => commit(commandGameSession(sessionRef.current, action));
+  const command = action => {
+    // Freeze covers direct touch/fire commands as well as RAF stepping.
+    // Navigation/pause remains available so the developer can leave safely.
+    if (captureFrozen && ['move', 'fire', 'toggleAutoFire'].includes(action.type)) return;
+    commit(commandGameSession(sessionRef.current, action));
+  };
   const { panHandlers, updateTilt } = usePlayerControls({
     width, playerWidth: player.width, tiltEnabled: tiltControlEnabled, tiltSensitivity,
     isPaused: controlsStopped, isAlive: player.alive, gameOver, inBonusRound,
@@ -116,13 +133,17 @@ export default function GameScreen({ onExit, showTutorial = false, showFirstPlay
   // Read current input/settings/geometry even before passive effects run.
   frameRef.current = elapsed => {
     const state = sessionRef.current;
-    const dt = Math.min(MAX_FRAME_SECONDS, Math.max(0, elapsed));
+    const requestedSpeed = captureActive ? captureSession.timeScale ?? 1 : 1;
+    const speed = [0, 0.5, 1].includes(requestedSpeed) ? requestedSpeed : 1;
+    if (captureActive && speed === 0) return;
+    const dt = Math.min(MAX_FRAME_SECONDS, Math.max(0, elapsed * speed));
+    const random = captureActive ? captureSession.random : Math.random;
     if (isGameplayActive(state)) {
       const playerX = updateTilt(dt, state.player.x);
-      commit(stepGameSession({ ...state, width, height }, dt, { playerX, firePressed: fireHeldRef.current }), dt);
+      commit(stepGameSession({ ...state, width, height }, dt, { playerX, firePressed: fireHeldRef.current }, random), dt);
       updateStars(dt);
     } else if (state.phase === 'transition' || state.phase === 'bossDeath') {
-      commit(stepGameSession(state, dt), dt);
+      commit(stepGameSession(state, dt, {}, random), dt);
     }
   };
 
@@ -159,20 +180,27 @@ export default function GameScreen({ onExit, showTutorial = false, showFirstPlay
   }, []);
 
   useEffect(() => {
+    if (captureFrozen) fireHeldRef.current = false;
+  }, [captureFrozen]);
+
+  useEffect(() => {
     if (!loaded) return;
     let cancelled = false;
     AudioManager.initializeAudio().then(() => {
       if (!cancelled && mounted.current) {
         const current = sessionRef.current;
+        if (captureActive && current.phase === 'lost') return AudioManager.playMusic('gameOver');
+        if (captureActive && current.phase === 'won') return AudioManager.stopMusic();
         if (current.phase === 'won' || current.phase === 'lost') return;
-        return AudioManager.playMusic(current.boss?.alive ? 'boss' : 'gameplay');
+        return AudioManager.playMusic(current.boss?.alive || captureActive && current.phase === 'bossDeath'
+          ? 'boss' : 'gameplay');
       }
     }).catch(error => console.warn('Game audio initialization failed:', error));
     return () => { cancelled = true; };
   }, [loaded]);
   useEffect(() => { AudioManager.setMusicTempo(level); }, [level]);
   useEffect(() => {
-    if (!showFirstPlayCue || showTutorial) return;
+    if (captureActive || !showFirstPlayCue || showTutorial) return;
     let cancelled = false;
     AsyncStorage.getItem(FIRST_PLAY_CUE_KEY).then(seen => {
       if (cancelled || seen === '1' || !isGameplayActive(sessionRef.current)) return;
@@ -199,6 +227,7 @@ export default function GameScreen({ onExit, showTutorial = false, showFirstPlay
   }, [achievementToast, snapshot.sessionId]);
 
   const resetGame = () => {
+    if (captureActive) { captureSession.onReset?.(); return; }
     const fresh = createGameSession(width, height, false, sessionRef.current.sessionId + 1);
     exiting.current = false;
     presentationRef.current = createPresentationState(fresh);
@@ -232,7 +261,7 @@ export default function GameScreen({ onExit, showTutorial = false, showFirstPlay
   const handleAutoToggle = () => command({ type: 'toggleAutoFire' });
   const fireWeapon = () => command({ type: 'fire' });
   const beginFireHold = () => {
-    if (!isGameplayActive(sessionRef.current)) return;
+    if (captureFrozen || !isGameplayActive(sessionRef.current)) return;
     fireHeldRef.current = true;
     fireWeapon();
   };

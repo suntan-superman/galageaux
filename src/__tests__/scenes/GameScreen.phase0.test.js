@@ -92,6 +92,84 @@ describe('mounted production GameScreen frame contract', () => {
     await mount(false, { showFirstPlayCue: true });
     expect(cue()).toBe(false);
   });
+  it.each([[false, 'true'], [true, 'false']])(
+    'ignores injected capture state when __DEV__=%s and opt-in=%s', async (dev, flag) => {
+      const previousDev = global.__DEV__;
+      const previousFlag = process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO;
+      try {
+        global.__DEV__ = dev;
+        process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO = flag;
+        const injected = Simulation.createGameSession(400, 800);
+        injected.currentStage = 'stage3'; injected.level = 6; injected.score = 99999;
+        await mount(false, { captureSession: { initialState: injected, random: () => 0.5, timeScale: 0 } });
+        expect(props('GameHUD')).toMatchObject({ currentStage: 'stage1', level: 1, score: 0 });
+        expect(Achievements.checkAchievements).toHaveBeenCalledWith(expect.objectContaining({ gameStart: true }));
+        await frame(16); await frame(16);
+        expect(props('Enemies').enemies.length).toBeGreaterThan(0);
+      } finally {
+        global.__DEV__ = previousDev;
+        if (previousFlag === undefined) delete process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO;
+        else process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO = previousFlag;
+      }
+    }
+  );
+  it('freezes only an opted-in capture and never writes its synthetic score to local stats', async () => {
+    const previousDev = global.__DEV__;
+    const previousFlag = process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO;
+    try {
+      global.__DEV__ = true;
+      process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO = 'true';
+      const injected = Simulation.createGameSession(400, 800);
+      injected.currentStage = 'stage2'; injected.level = 3; injected.score = 25000;
+      const random = jest.fn(() => 0.5);
+      const captureSession = { initialState: injected, random, starRandom: () => 0.5, timeScale: 0 };
+      await mount(false, { captureSession });
+      await frame(16); await frame(16);
+      expect(props('GameHUD')).toMatchObject({ currentStage: 'stage2', level: 3, score: 25000 });
+      expect(props('Enemies').enemies).toHaveLength(0);
+      const frozenX = props('PlayerShip').player.x;
+      const touchSurface = screen.root.findAllByType('View').find(node => node.props.onTestMove);
+      await act(async () => {
+        touchSurface.props.onTestMove(300);
+        props('FireButton').onFire();
+        props('FireButton').onPressIn();
+      });
+      expect(props('PlayerShip').player.x).toBe(frozenX);
+      expect(props('PlayerBullets').bullets).toHaveLength(0);
+      expect(Achievements.checkAchievements).not.toHaveBeenCalled();
+      await act(async () => screen.update(<GameScreen onExit={jest.fn()}
+        captureSession={{ ...captureSession, timeScale: 1 }} />));
+      await frame(16); await frame(16);
+      expect(props('Enemies').enemies.length).toBeGreaterThan(0);
+      expect(random).toHaveBeenCalled();
+      expect(Achievements.checkAchievements).not.toHaveBeenCalled();
+    } finally {
+      global.__DEV__ = previousDev;
+      if (previousFlag === undefined) delete process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO;
+      else process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO = previousFlag;
+    }
+  });
+  it('releases the capture frame loop and app listener when the studio leaves gameplay', async () => {
+    const previousDev = global.__DEV__;
+    const previousFlag = process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO;
+    try {
+      global.__DEV__ = true;
+      process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO = 'true';
+      const initialState = Simulation.createGameSession(400, 800);
+      initialState.score = 50000;
+      await mount(false, { captureSession: { initialState, random: () => 0.5, starRandom: () => 0.5, timeScale: 1 } });
+      const subscription = AppState.addEventListener.mock.results[0].value;
+      expect(raf.size).toBe(1);
+      await act(async () => screen.unmount()); screen = null;
+      expect(raf.size).toBe(0);
+      expect(subscription.remove).toHaveBeenCalledTimes(1);
+      expect(Achievements.checkAchievements).not.toHaveBeenCalled();
+    } finally {
+      global.__DEV__ = previousDev;
+      if (previousFlag === undefined) delete process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO;
+      else process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO = previousFlag;
+    }
+  });
   it('offers Pause as the only in-run quit path without finalizing an abandoned score', async () => {
     const onExit = jest.fn();
     await mount(false, { onExit });

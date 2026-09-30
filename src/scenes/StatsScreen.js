@@ -13,6 +13,7 @@ import { Canvas, Rect, Circle, LinearGradient, vec } from '@shopify/react-native
 import * as AchievementManager from '../engine/achievements';
 import * as AudioManager from '../engine/audio';
 import { formatScore } from '../i18n';
+import { isCaptureStudioEnabled } from '../dev/captureGate';
 
 const EMPTY_STATS = {
   totalKills: 0,
@@ -26,12 +27,16 @@ const EMPTY_STATS = {
   totalScore: 0,
 };
 
-export default function StatsScreen({ onBack }) {
+export default function StatsScreen({ onBack, captureFixture }) {
   const { width, height } = useWindowDimensions();
   const [stats, setStats] = useState(EMPTY_STATS);
   const [isLoading, setIsLoading] = useState(true);
+  const useFixture = isCaptureStudioEnabled() && captureFixture != null;
+  const visibleStats = useFixture ? captureFixture : stats;
 
   useEffect(() => {
+    // Capture fixture data is display-only: do not read or mutate local lifetime stats.
+    if (useFixture) return undefined;
     let active = true;
     // This manager owns galageaux:stats and shares the first storage read with gameplay.
     AchievementManager.loadAchievements()
@@ -43,7 +48,7 @@ export default function StatsScreen({ onBack }) {
         if (active) setIsLoading(false);
       });
     return () => { active = false; };
-  }, []);
+  }, [useFixture]);
 
   const handleBack = () => {
     AudioManager.playSound('uiClick', 0.6);
@@ -64,8 +69,8 @@ export default function StatsScreen({ onBack }) {
     </View>
   );
 
-  const stagesCompleted = Array.isArray(stats.stagesCompleted)
-    ? stats.stagesCompleted.filter(stage => Number.isInteger(stage) && stage > 0)
+  const stagesCompleted = Array.isArray(visibleStats.stagesCompleted)
+    ? visibleStats.stagesCompleted.filter(stage => Number.isInteger(stage) && stage > 0)
     : [];
   const stagesLabel = stagesCompleted.length
     ? stagesCompleted.sort((a, b) => a - b).map(stage => `Stage ${stage}`).join(', ')
@@ -100,7 +105,7 @@ export default function StatsScreen({ onBack }) {
           <Text style={styles.title}>📊 STATISTICS</Text>
         </View>
 
-        {isLoading ? (
+        {isLoading && !useFixture ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#60a5fa" />
             <Text style={styles.loadingText}>Loading stats...</Text>
@@ -111,29 +116,29 @@ export default function StatsScreen({ onBack }) {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            {stats.gamesPlayed === 0 && (
+            {visibleStats.gamesPlayed === 0 && (
               <Text style={styles.emptyNote}>No runs yet. Play a game to build your stats.</Text>
             )}
 
             <StatCard title="🏆 Scores">
-              <StatRow label="Best Score Reached" value={formatScore(stats.highScore)} highlight />
-              <StatRow label="Total Finalized Score" value={formatScore(stats.totalScore)} />
+              <StatRow label="Best Score Reached" value={formatScore(visibleStats.highScore)} highlight />
+              <StatRow label="Total Finalized Score" value={formatScore(visibleStats.totalScore)} />
             </StatCard>
 
             <StatCard title="🚀 Campaign">
-              <StatRow label="Runs Started" value={formatScore(stats.gamesPlayed)} />
-              <StatRow label="Highest Level Reached" value={stats.maxLevel || '—'} />
+              <StatRow label="Runs Started" value={formatScore(visibleStats.gamesPlayed)} />
+              <StatRow label="Highest Level Reached" value={visibleStats.maxLevel || '—'} />
               <StatRow label="Stages Cleared" value={stagesLabel} />
             </StatCard>
 
             <StatCard title="💥 Combat">
-              <StatRow label="Enemies Destroyed" value={formatScore(stats.totalKills)} />
-              <StatRow label="Bosses Defeated" value={formatScore(stats.totalBosses)} />
-              <StatRow label="Best Combo" value={`${stats.maxCombo}x`} highlight />
+              <StatRow label="Enemies Destroyed" value={formatScore(visibleStats.totalKills)} />
+              <StatRow label="Bosses Defeated" value={formatScore(visibleStats.totalBosses)} />
+              <StatRow label="Best Combo" value={`${visibleStats.maxCombo}x`} highlight />
             </StatCard>
 
             <StatCard title="⚡ Powerups">
-              <StatRow label="Powerups Collected" value={formatScore(stats.totalPowerups)} />
+              <StatRow label="Powerups Collected" value={formatScore(visibleStats.totalPowerups)} />
             </StatCard>
 
             <Text style={styles.footerText}>

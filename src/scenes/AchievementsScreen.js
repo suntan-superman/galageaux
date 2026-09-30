@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ACHIEVEMENTS, loadAchievements, getUnlockedAchievements, getStats } from '../engine/achievements';
+import { isCaptureStudioEnabled } from '../dev/captureGate';
 
 // Achievement category groupings
 const CATEGORIES = {
@@ -206,27 +207,35 @@ function CategorySection({ category, unlockedSet, stats }) {
   );
 }
 
-export default function AchievementsScreen({ onBack }) {
+export default function AchievementsScreen({ onBack, captureFixture }) {
   const [unlocked, setUnlocked] = useState(new Set());
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
+  const useFixture = isCaptureStudioEnabled() && captureFixture != null;
+  const visibleUnlocked = useFixture ? new Set(captureFixture.unlocked) : unlocked;
+  const visibleStats = useFixture ? captureFixture.stats : stats;
 
   const totalAchievements = Object.keys(ACHIEVEMENTS).length;
-  const unlockedCount = unlocked.size;
+  const unlockedCount = visibleUnlocked.size;
   const completionPercent = Math.round((unlockedCount / totalAchievements) * 100);
 
   useEffect(() => {
+    // Capture fixture data is display-only: do not read or mutate saved achievements.
+    if (useFixture) return undefined;
+    let active = true;
     async function load() {
       await loadAchievements();
+      if (!active) return;
       const unlockedList = getUnlockedAchievements();
       setUnlocked(new Set(unlockedList));
       setStats(getStats());
       setLoading(false);
     }
     load();
-  }, []);
+    return () => { active = false; };
+  }, [useFixture]);
 
-  if (loading) {
+  if (loading && !useFixture) {
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -268,8 +277,8 @@ export default function AchievementsScreen({ onBack }) {
           <CategorySection
             key={key}
             category={category}
-            unlockedSet={unlocked}
-            stats={stats}
+            unlockedSet={visibleUnlocked}
+            stats={visibleStats}
           />
         ))}
         
@@ -277,27 +286,27 @@ export default function AchievementsScreen({ onBack }) {
           <Text style={styles.statsTitle}>📊 Lifetime Stats</Text>
           <View style={styles.statsGrid}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.totalKills || 0}</Text>
+              <Text style={styles.statValue}>{visibleStats.totalKills || 0}</Text>
               <Text style={styles.statLabel}>Enemies Destroyed</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.totalBosses || 0}</Text>
+              <Text style={styles.statValue}>{visibleStats.totalBosses || 0}</Text>
               <Text style={styles.statLabel}>Bosses Defeated</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.totalPowerups || 0}</Text>
+              <Text style={styles.statValue}>{visibleStats.totalPowerups || 0}</Text>
               <Text style={styles.statLabel}>Power-Ups Collected</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.maxCombo || 0}x</Text>
+              <Text style={styles.statValue}>{visibleStats.maxCombo || 0}x</Text>
               <Text style={styles.statLabel}>Best Combo</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{(stats.highScore || 0).toLocaleString()}</Text>
+              <Text style={styles.statValue}>{(visibleStats.highScore || 0).toLocaleString()}</Text>
               <Text style={styles.statLabel}>High Score</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.gamesPlayed || 0}</Text>
+              <Text style={styles.statValue}>{visibleStats.gamesPlayed || 0}</Text>
               <Text style={styles.statLabel}>Games Played</Text>
             </View>
           </View>

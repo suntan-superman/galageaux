@@ -10,6 +10,7 @@ import AchievementsScreen from './AchievementsScreen';
 import SettingsScreen from './SettingsScreen';
 import StatsScreen from './StatsScreen';
 import AudioStatusBadge from '../components/AudioStatusBadge';
+import { isCaptureStudioEnabled } from '../dev/captureGate';
 
 const FIRST_PLAY_CUE_KEY = 'galageaux:firstPlayCueSeen';
 
@@ -40,10 +41,13 @@ export default function MainMenu() {
   const [achievementsVisible, setAchievementsVisible] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [statsVisible, setStatsVisible] = useState(false);
+  const [captureVisible, setCaptureVisible] = useState(false);
   const preferencesRestored = useRef(false);
   const audioInitialization = useRef(null);
   const openedShowMe = useRef(false);
-  const menuVisible = !inGame && !showDemo && !achievementsVisible && !settingsVisible && !statsVisible;
+  const captureEnabled = isCaptureStudioEnabled();
+  const menuVisible = !inGame && !showDemo && !achievementsVisible && !settingsVisible && !statsVisible
+    && !(captureEnabled && captureVisible);
   const buttonWidth = Math.min(320, Math.max(0, width - 48));
 
   // Restore preferences before cold-menu playback; never save scaled track gain.
@@ -114,11 +118,21 @@ export default function MainMenu() {
     setStatsVisible(true);
   };
 
+  const handleCaptureClick = () => {
+    if (!isCaptureStudioEnabled()) return;
+    setCaptureVisible(true);
+  };
+
   if (inGame) return <GameScreen onExit={() => setInGame(false)} showFirstPlayCue={showFirstPlayCue} />;
   if (showDemo) return <ShowMeDemo onBack={() => setShowDemo(false)} onPlay={() => { setShowFirstPlayCue(false); setShowDemo(false); setInGame(true); }} />;
   if (achievementsVisible) return <AchievementsScreen onBack={() => setAchievementsVisible(false)} />;
   if (settingsVisible) return <SettingsScreen onBack={() => setSettingsVisible(false)} />;
   if (statsVisible) return <StatsScreen onBack={() => setStatsVisible(false)} />;
+  if (captureEnabled && captureVisible) {
+    // The dev-only route is never imported/evaluated by a disabled production menu.
+    const CaptureStudio = require('../dev/CaptureStudio').default;
+    return <CaptureStudio onBack={() => setCaptureVisible(false)} />;
+  }
 
   return (
     <View style={styles.container}>
@@ -146,6 +160,8 @@ export default function MainMenu() {
           <MenuButton label="ACHIEVEMENTS" icon="🏆" width={buttonWidth} style={styles.achievementsButton} textStyle={styles.achievementsButtonText} onPress={handleAchievementsClick} />
           <MenuButton label="SETTINGS" icon="⚙️" width={buttonWidth} style={styles.settingsButton} textStyle={styles.settingsButtonText} onPress={handleSettingsClick} />
           <MenuButton label="STATS" icon="📊" width={buttonWidth} style={styles.statsButton} textStyle={styles.statsButtonText} onPress={handleStatsClick} />
+          {captureEnabled && <MenuButton label="DEV · CAPTURE STUDIO" width={Math.min(280, buttonWidth)}
+            style={styles.captureDevButton} textStyle={styles.captureDevButtonText} onPress={handleCaptureClick} />}
         </View>
       </View>
     </View>
@@ -242,4 +258,6 @@ const styles = StyleSheet.create({
   statsButtonText: {
     color: '#06b6d4'
   },
+  captureDevButton: { backgroundColor: '#451a03', borderWidth: 1, borderColor: '#f97316', paddingVertical: 9 },
+  captureDevButtonText: { color: '#fdba74', fontSize: 12, letterSpacing: 1 },
 });

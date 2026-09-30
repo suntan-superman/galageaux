@@ -47,4 +47,16 @@ describe('presentation starfield lifecycle', () => {
     expect(next[1]).toEqual({ id: 'staying', x: 100, y: 202, speed: 20 });
     expect(rng).toHaveBeenCalledTimes(1);
   });
+
+  it('accepts a capture-only seeded stream without sampling global randomness', () => {
+    const seeded = () => {
+      let value = 17;
+      return () => { value = (value * 1664525 + 1013904223) >>> 0; return value / 4294967296; };
+    };
+    const globalRandom = jest.spyOn(Math, 'random').mockImplementation(() => { throw new Error('global RNG used'); });
+    const first = createStarField(390, 844, 12, seeded());
+    const second = createStarField(390, 844, 12, seeded());
+    expect(first).toEqual(second);
+    expect(globalRandom).not.toHaveBeenCalled();
+  });
 });

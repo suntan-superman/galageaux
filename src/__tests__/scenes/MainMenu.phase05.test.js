@@ -25,20 +25,28 @@ jest.mock('../../scenes/AchievementsScreen', () => 'AchievementsScreen');
 jest.mock('../../scenes/SettingsScreen', () => 'SettingsScreen');
 jest.mock('../../scenes/StatsScreen', () => 'StatsScreen');
 jest.mock('../../components/AudioStatusBadge', () => 'AudioStatusBadge');
+jest.mock('../../dev/CaptureStudio', () => ({ __esModule: true, default: 'CaptureStudio' }));
 
 const flatten = style => Object.assign({}, ...[style].flat(Infinity).filter(Boolean));
 const labels = ['PLAY', 'SHOW ME HOW', 'ACHIEVEMENTS', 'SETTINGS', 'STATS'];
+const initialCaptureFlag = process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO;
 let renderer;
 const mount = async () => { await act(async () => { renderer = create(<MainMenu />); }); };
 const press = async index => { await act(async () => renderer.root.findAllByType('TouchableOpacity')[index].props.onPress()); };
 beforeEach(() => {
   global.IS_REACT_ACT_ENVIRONMENT = true;
   jest.clearAllMocks(); mockWidth = 390;
+  delete process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO;
   AsyncStorage.getItem.mockResolvedValue(null);
   Audio.initializeAudio.mockResolvedValue({ success: true });
   Audio.getAudioSettings.mockReturnValue({ musicEnabled: true, musicVolume: 0.5 });
 });
-afterEach(async () => { if (renderer) await act(async () => renderer.unmount()); renderer = null; });
+afterEach(async () => {
+  if (renderer) await act(async () => renderer.unmount());
+  renderer = null;
+  if (initialCaptureFlag === undefined) delete process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO;
+  else process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO = initialCaptureFlag;
+});
 
 it.each([320, 375, 390, 430])('keeps all labels single-line and readable within a %s-point viewport', async width => {
   mockWidth = width; await mount();
@@ -126,6 +134,67 @@ it('keeps Account hidden and requests a first-play cue only for direct PLAY', as
     .not.toContain('ACCOUNT');
   await press(0);
   expect(renderer.root.findByType('GameScreen').props.showFirstPlayCue).toBe(true);
+});
+
+it('keeps the five-button release menu and capture route absent with __DEV__ false', async () => {
+  const previousDev = global.__DEV__;
+  const previousFlag = process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO;
+  try {
+    global.__DEV__ = false;
+    process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO = 'true';
+    await mount();
+    expect(renderer.root.findAllByType('TouchableOpacity').map(button => button.props.accessibilityLabel))
+      .toEqual(labels);
+    await press(0);
+    expect(renderer.root.findAllByType('CaptureStudio')).toHaveLength(0);
+    expect(renderer.root.findByType('GameScreen').props.showFirstPlayCue).toBe(true);
+  } finally {
+    global.__DEV__ = previousDev;
+    if (previousFlag === undefined) delete process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO;
+    else process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO = previousFlag;
+  }
+});
+
+it('keeps capture absent when the explicit env opt-in is missing or false', async () => {
+  const previousDev = global.__DEV__;
+  const previousFlag = process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO;
+  try {
+    global.__DEV__ = true;
+    delete process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO;
+    await mount();
+    expect(renderer.root.findAllByType('TouchableOpacity').map(button => button.props.accessibilityLabel))
+      .toEqual(labels);
+    await act(async () => renderer.unmount()); renderer = null;
+    process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO = 'false';
+    await mount();
+    expect(renderer.root.findAllByType('TouchableOpacity').map(button => button.props.accessibilityLabel))
+      .toEqual(labels);
+  } finally {
+    global.__DEV__ = previousDev;
+    if (previousFlag === undefined) delete process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO;
+    else process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO = previousFlag;
+  }
+});
+
+it('offers the distinctly labeled Capture Studio route only when both gates are enabled', async () => {
+  const previousDev = global.__DEV__;
+  const previousFlag = process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO;
+  try {
+    global.__DEV__ = true;
+    process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO = 'true';
+    await mount();
+    const buttons = renderer.root.findAllByType('TouchableOpacity');
+    expect(buttons.map(button => button.props.accessibilityLabel))
+      .toEqual([...labels, 'DEV · CAPTURE STUDIO']);
+    await press(5);
+    expect(renderer.root.findAllByType('CaptureStudio')).toHaveLength(1);
+    await act(async () => renderer.root.findByType('CaptureStudio').props.onBack());
+    expect(renderer.root.findAllByType('CaptureStudio')).toHaveLength(0);
+  } finally {
+    global.__DEV__ = previousDev;
+    if (previousFlag === undefined) delete process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO;
+    else process.env.EXPO_PUBLIC_ENABLE_CAPTURE_STUDIO = previousFlag;
+  }
 });
 
 it('waits for the same pending initialization when returning rapidly to the menu', async () => {
